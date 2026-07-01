@@ -50,7 +50,7 @@ from emission_project.utils import (  # noqa: E402
 )
 
 
-_CONFIG_PATH_VALUE = Path(os.environ.get("MAINLINE_CONFIG_PATH", "config.predict.mainline_solvent.YAML"))
+_CONFIG_PATH_VALUE = Path(os.environ.get("MAINLINE_CONFIG_PATH", "config.predict.mainline.yaml"))
 CONFIG_PATH = _CONFIG_PATH_VALUE if _CONFIG_PATH_VALUE.is_absolute() else PROJECT_ROOT / _CONFIG_PATH_VALUE
 MODEL_OUTPUT_DIR = PROJECT_ROOT / "models" / "mainline"
 DEFAULT_MODEL_DISPLAY = "Optuna-XGBoost + OOF-NN correction"
