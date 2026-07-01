@@ -1,0 +1,47 @@
+runtime:
+  stage: predict
+
+paths:
+  base_dir: .
+  output_dir: models/mainline
+  raw_data_file: data/data/data_shiny_solvent_clean.csv
+  prediction_file: data/prediction/SMILES_solvent_template.csv
+  trained_model_file: models/mainline/XGB_Final_Model.json
+  selected_features_file: models/mainline/Final_Model_Selected_Features.csv
+  artifact_metadata_file: models/mainline/Model_Artifacts_Metadata.json
+
+pipeline:
+  target_col: lambda_em_nm
+  absorb_col: null
+  smiles_col: SMILES
+  solvent_col: Solvent
+  morgan_radius: 2
+  morgan_bits: 2048
+  use_morgan_features: true
+  use_maccs_keys: false
+  use_rdkit_descriptors: false
+  use_fragment_features: true
+  use_solvent_features: true
+  test_size: 0.2
+  stratify_bins: 5
+  similarity_threshold: 0.5
+  n_selected_features: 82
+  random_state: 48
+  outer_folds: 10
+  inner_folds: 3
+  apply_vif_filter: true
+  vif_threshold: 10.0
+  min_features_after_vif: 20
+  shap_sample_limit: 100
+  prediction_shap_limit: 50
+  sample_plot_feature_limit: 15
+  max_cpu_threads: 10
+  deduplicate_smiles: true
+  fixed_feature_list_file: null
+  final_model_type: xgb
+  final_ensemble_algorithms: null
+  final_ensemble_mode: mean
+  tune_final_xgb: true
+  final_xgb_tuning_iterations: 50
+  final_xgb_tuning_cv_folds: 10
+  auto_cleanup_intermediate_outputs: false

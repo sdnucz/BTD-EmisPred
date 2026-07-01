@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "n_trials_requested": 50,
+  "timeout_seconds": 0,
+  "completed_trials": 50,
+  "best_trial_number": 36,
+  "best_cv_RMSE_mean": 59.46702467659958,
+  "best_cv_MAE_mean": 41.31664110893347,
+  "best_cv_R2_mean": 0.9162575689163871,
+  "best_params": {
+    "n_estimators": 600,
+    "max_depth": 6,
+    "learning_rate": 0.04445597541477667,
+    "subsample": 0.5944915406038741,
+    "colsample_bytree": 0.9342847213850177,
+    "objective": "reg:squarederror",
+    "min_child_weight": 6,
+    "gamma": 0.32821477717874986,
+    "reg_alpha": 0.006511953736075419,
+    "reg_lambda": 1.4185008991924903
+  }
+}
