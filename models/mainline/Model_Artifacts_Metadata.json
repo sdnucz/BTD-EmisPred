@@ -3,11 +3,11 @@
     "name": "Optuna-XGB + gated NN residual correction",
     "type": "xgb",
     "base_model_type": "xgb",
-    "path": "/home/student11/fsyc/outputs/mainline_xgb_optuna_nn_fixed_sim05_cap40_seed48_20260617/XGB_Final_Model.json"
+    "path": "/your/path/to/NIR-II-EmisPred-Paper/models/mainline/XGB_Final_Model.json"
   },
   "selected_features": {
     "count": 82,
-    "path": "/home/student11/fsyc/outputs/mainline_xgb_optuna_nn_fixed_sim05_cap40_seed48_20260617/Final_Model_Selected_Features.csv"
+    "path": "/your/path/to/NIR-II-EmisPred-Paper/models/mainline/Final_Model_Selected_Features.csv"
   },
   "fingerprint": {
     "morgan_radius": 2,

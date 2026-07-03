@@ -6,8 +6,7 @@ study.
 
 Given a molecular SMILES string and a solvent label, the packaged model predicts
 the emission wavelength in nm. The current release is designed for model
-deployment, web demonstration, and reproducible inference rather than full
-training-data redistribution.
+deployment and web demonstration rather than full training-data redistribution.
 
 ## Overview
 
@@ -50,7 +49,6 @@ line/package inference code.
 |       |-- NN_Residual_Correction_Config.json
 |       |-- NN_Residual_Correction_Library.csv
 |       |-- Model_Artifacts_Metadata.json
-|       |-- mainline_nn_metrics.csv
 |       `-- mainline_xgb_optuna_summary.json
 `-- web_app/
     |-- app.py
@@ -75,6 +73,19 @@ sufficient:
 pip install -r requirements.txt
 ```
 
+## Path Configuration
+
+The repository uses relative paths by default through
+`config.predict.mainline.yaml`. If you move the model files, deploy the web app
+outside this repository, or adapt the metadata file, replace example paths such
+as:
+
+```text
+/your/path/to/NIR-II-EmisPred-Paper
+```
+
+with the actual path on your own machine or server.
+
 ## Model Assets
 
 The exported model files are stored in `models/mainline/`.
@@ -89,7 +100,6 @@ Key files:
   correction module.
 - `Model_Artifacts_Metadata.json`: model, fingerprint, feature-block, and
   training-artifact metadata.
-- `mainline_nn_metrics.csv`: packaged performance snapshot.
 
 The fixed feature list is required. New molecules are featurized first and then
 reindexed to this saved feature order before prediction.
@@ -154,43 +164,6 @@ Required columns:
 
 Solvent names should be standardized when possible, for example `THF`, `H2O`,
 `Toluene`, or `DMSO`.
-
-## Performance Snapshot
-
-The packaged artifact includes a held-out test snapshot and training OOF
-metrics in:
-
-```text
-models/mainline/mainline_nn_metrics.csv
-```
-
-For the exported XGBoost model with gated nearest-neighbor residual correction,
-the held-out test snapshot in the package reports:
-
-```text
-n = 199
-R2 = 0.9587
-RMSE = 43.21 nm
-MAE = 32.10 nm
-```
-
-These values describe the packaged model artifact and should be updated if the
-model files are replaced.
-
-## Notes on Reproducibility
-
-This repository is a paper companion inference package. It intentionally does
-not include the original raw training table or historical experiment outputs.
-
-To keep inference reproducible:
-
-1. Keep `config.predict.mainline.yaml` aligned with the exported model files.
-2. Do not change `Final_Model_Selected_Features.csv` without exporting a matching
-   model.
-3. Keep the residual correction library and correction config from the same
-   training run.
-4. Use the same feature-generation settings recorded in
-   `Model_Artifacts_Metadata.json`.
 
 ## Citation
 
