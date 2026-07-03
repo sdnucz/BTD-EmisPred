@@ -10,8 +10,6 @@ data/data/*
 !data/data/nir2_emission_dataset.csv
 !data/data/README.md
 outputs/
-models/mainline/*
-!models/mainline/.gitkeep
 *.log
 *.tmp
 *.bak
