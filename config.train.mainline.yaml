@@ -1,9 +1,11 @@
 runtime:
-  stage: predict
+  # Use "compare" to run cross-validated model selection only.
+  # Use "final" to train/evaluate the final model only.
+  # Use "all" to run comparison, final training, test evaluation and prediction in one run.
+  stage: all
 
 paths:
   base_dir: .
-  # This directory must be produced by your own training run.
   output_dir: outputs/mainline_retrain
   raw_data_file: data/your_training_data.csv
   prediction_file: data/prediction/SMILES_solvent_template.csv
@@ -12,11 +14,13 @@ paths:
   artifact_metadata_file: outputs/mainline_retrain/Model_Artifacts_Metadata.json
 
 pipeline:
-  # Keep these consistent with config.train.mainline.yaml.
+  # Change these three column names to match your own training table.
   target_col: lambda_em_nm
   absorb_col: null
   smiles_col: SMILES
   solvent_col: Solvent
+
+  # Feature construction.
   morgan_radius: 2
   morgan_bits: 2048
   use_morgan_features: true
@@ -24,6 +28,8 @@ pipeline:
   use_rdkit_descriptors: false
   use_fragment_features: true
   use_solvent_features: true
+
+  # Data split and feature selection.
   test_size: 0.2
   stratify_bins: 5
   similarity_threshold: 0.5
@@ -34,12 +40,16 @@ pipeline:
   apply_vif_filter: true
   vif_threshold: 10.0
   min_features_after_vif: 20
+
+  # Runtime and output controls.
   shap_sample_limit: 100
   prediction_shap_limit: 50
   sample_plot_feature_limit: 15
   max_cpu_threads: 10
   deduplicate_smiles: true
   fixed_feature_list_file: null
+
+  # Final model. XGBoost is the default mainline model after model comparison.
   final_model_type: xgb
   final_ensemble_algorithms: null
   final_ensemble_mode: mean

@@ -7,8 +7,9 @@ import joblib
 import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin, clone
 from lightgbm import LGBMRegressor
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -64,94 +65,116 @@ class MeanRegressorEnsemble(BaseEstimator, RegressorMixin):
 
 
 def build_model_specs(random_state: int, max_cpu_threads: int) -> dict[str, tuple[Any, dict[str, list[Any]]]]:
-    return {
-        "RF": (
-            RandomForestRegressor(random_state=random_state, n_jobs=max_cpu_threads),
-            {
-                "n_estimators": [100, 200],
-                "max_depth": [None, 8, 12],
-                "min_samples_split": [2, 5],
-            },
-        ),
-        "KRR": (
-            Pipeline(
-                [
-                    ("scaler", StandardScaler()),
-                    ("model", KernelRidge()),
-                ]
+    specs: dict[str, tuple[Any, dict[str, list[Any]]]] = {}
+
+    if CatBoostRegressor is not None:
+        specs["CatBoost"] = (
+            CatBoostRegressor(
+                loss_function="RMSE",
+                random_seed=random_state,
+                verbose=False,
+                thread_count=max_cpu_threads,
+                allow_writing_files=False,
             ),
             {
-                "model__alpha": [0.001, 0.01, 0.1],
-                "model__gamma": [0.001, 0.01, 0.1],
-                "model__kernel": ["rbf"],
+                "iterations": [300, 600],
+                "depth": [4, 6],
+                "learning_rate": [0.03, 0.08],
+                "l2_leaf_reg": [3.0, 5.0],
             },
-        ),
-        "XGB": (
-            XGBRegressor(
-                random_state=random_state,
-                n_jobs=max_cpu_threads,
-                verbosity=0,
-                objective="reg:squarederror",
-                tree_method="hist",
-                device="cpu",
+        )
+
+    specs.update(
+        {
+            "XGBoost": (
+                XGBRegressor(
+                    random_state=random_state,
+                    n_jobs=max_cpu_threads,
+                    verbosity=0,
+                    objective="reg:squarederror",
+                    tree_method="hist",
+                    device="cpu",
+                ),
+                {
+                    "n_estimators": [100, 200],
+                    "max_depth": [3, 5, 7],
+                    "learning_rate": [0.01, 0.1],
+                    "subsample": [0.8, 1.0],
+                },
             ),
-            {
-                "n_estimators": [100, 200],
-                "max_depth": [3, 5, 7],
-                "learning_rate": [0.01, 0.1],
-                "subsample": [0.8, 1.0],
-            },
-        ),
-        "LGB": (
-            LGBMRegressor(
-                random_state=random_state,
-                n_jobs=max_cpu_threads,
-                verbosity=-1,
-                device_type="cpu",
+            "LightGBM": (
+                LGBMRegressor(
+                    random_state=random_state,
+                    n_jobs=max_cpu_threads,
+                    verbosity=-1,
+                    device_type="cpu",
+                ),
+                {
+                    "n_estimators": [100, 200],
+                    "max_depth": [3, 5, 7],
+                    "learning_rate": [0.01, 0.1],
+                    "num_leaves": [31, 63],
+                },
             ),
-            {
-                "n_estimators": [100, 200],
-                "max_depth": [3, 5, 7],
-                "learning_rate": [0.01, 0.1],
-                "num_leaves": [31, 63],
-            },
-        ),
-        "SVR": (
-            Pipeline(
-                [
-                    ("scaler", StandardScaler()),
-                    ("model", SVR()),
-                ]
+            "RF": (
+                RandomForestRegressor(random_state=random_state, n_jobs=max_cpu_threads),
+                {
+                    "n_estimators": [100, 200],
+                    "max_depth": [None, 8, 12],
+                    "min_samples_split": [2, 5],
+                },
             ),
-            {
-                "model__C": [1, 10, 100],
-                "model__gamma": [0.001, 0.01, 0.1],
-                "model__epsilon": [0.01, 0.1],
-            },
-        ),
-        "ANN": (
-            Pipeline(
-                [
-                    ("scaler", StandardScaler()),
-                    (
-                        "model",
-                        MLPRegressor(
-                            random_state=random_state,
-                            max_iter=1500,
-                            early_stopping=True,
-                            validation_fraction=0.1,
-                        ),
-                    ),
-                ]
+            "GBR": (
+                GradientBoostingRegressor(random_state=random_state),
+                {
+                    "n_estimators": [200, 500],
+                    "learning_rate": [0.03, 0.05, 0.1],
+                    "max_depth": [2, 3],
+                    "subsample": [0.8, 1.0],
+                },
             ),
-            {
-                "model__hidden_layer_sizes": [(32,), (64, 32)],
-                "model__activation": ["relu"],
-                "model__alpha": [0.0001, 0.001],
-                "model__learning_rate_init": [0.001, 0.01],
-            },
-        ),
-    }
+            "KNN": (
+                Pipeline(
+                    [
+                        ("scaler", StandardScaler()),
+                        ("model", KNeighborsRegressor()),
+                    ]
+                ),
+                {
+                    "model__n_neighbors": [3, 5, 10],
+                    "model__weights": ["uniform", "distance"],
+                    "model__p": [1, 2],
+                },
+            ),
+            "KRR": (
+                Pipeline(
+                    [
+                        ("scaler", StandardScaler()),
+                        ("model", KernelRidge()),
+                    ]
+                ),
+                {
+                    "model__alpha": [0.001, 0.01, 0.1],
+                    "model__gamma": [0.001, 0.01, 0.1],
+                    "model__kernel": ["rbf"],
+                },
+            ),
+            "SVR": (
+                Pipeline(
+                    [
+                        ("scaler", StandardScaler()),
+                        ("model", SVR()),
+                    ]
+                ),
+                {
+                    "model__C": [1, 10, 100],
+                    "model__gamma": [0.001, 0.01, 0.1],
+                    "model__epsilon": [0.01, 0.1],
+                },
+            ),
+        }
+    )
+    return specs
 
 
 def build_final_xgb_param_distributions() -> dict[str, list[Any]]:

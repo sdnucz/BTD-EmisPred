@@ -10,3 +10,4 @@ matplotlib
 seaborn
 shap
 rdkit
+catboost

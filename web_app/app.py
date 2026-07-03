@@ -53,7 +53,7 @@ from emission_project.utils import (  # noqa: E402
 _CONFIG_PATH_VALUE = Path(os.environ.get("MAINLINE_CONFIG_PATH", "config.predict.mainline.yaml"))
 CONFIG_PATH = _CONFIG_PATH_VALUE if _CONFIG_PATH_VALUE.is_absolute() else PROJECT_ROOT / _CONFIG_PATH_VALUE
 MODEL_OUTPUT_DIR = PROJECT_ROOT / "models" / "mainline"
-DEFAULT_MODEL_DISPLAY = "Optuna-XGBoost + OOF-NN correction"
+DEFAULT_MODEL_DISPLAY = "Tuned XGBoost"
 ASSET_DIR = APP_DIR / "assets"
 MAX_SMILES_LENGTH = int(os.environ.get("MAX_SMILES_LENGTH", "2048"))
 MAX_SOLVENT_LENGTH = int(os.environ.get("MAX_SOLVENT_LENGTH", "120"))
@@ -460,7 +460,7 @@ class MainlinePredictor:
                 "after_feature_screening_count": selection_info.get("after_correlation_count"),
                 "selected_feature_count": len(self.selected_features),
                 "feature_blocks": feature_blocks,
-                "base_model": self.experiment_config.get("base_model", "Optuna-tuned XGBoost"),
+                "base_model": self.experiment_config.get("base_model", "Tuned XGBoost"),
                 "model_selection": "Eight candidate regressors were compared by 10-fold CV on the training set; XGBoost is served as the final base model.",
                 "post_model_correction": post_model_correction,
             },
@@ -1186,7 +1186,7 @@ def render_layout(active: str, title: str, subtitle: str, content: str) -> str:
     {content}
   </main>
   <footer>
-    BTD-EmisPred: Optuna-XGBoost with gated OOF nearest-neighbor residual correction.
+    BTD-EmisPred: retrainable XGBoost workflow with optional OOF nearest-neighbor residual correction.
   </footer>
   {COMMON_SCRIPT}
 </body>
@@ -1200,15 +1200,15 @@ def render_home_page() -> str:
       <div class="surface">
         <h2>NIR-II emission wavelength prediction</h2>
         <p class="hero-lead">
-          This web app serves the current mainline model for solvent-aware NIR-II molecular emission
-          wavelength prediction. The model starts from 2095 candidate features, including Morgan
-          fingerprints, RDKit fragment counts, and solvent one-hot encoding, then uses training-set
-          feature screening to obtain a fixed 82-feature input for deployment.
+          This web app serves a retrained mainline model for solvent-aware NIR-II molecular emission
+          wavelength prediction. The workflow builds Morgan fingerprints, RDKit fragment counts,
+          and solvent one-hot features, then applies training-set feature screening to obtain the
+          fixed feature table used at deployment.
         </p>
         <p class="hero-lead">
-          The deployed predictor is an Optuna-tuned XGBoost model with a gated OOF nearest-neighbor
-          residual correction. The result panel reports the base XGBoost prediction, the correction
-          term, maximum neighbor similarity, and final emission wavelength.
+          After users train the model on their own data, the result panel reports the base XGBoost
+          prediction. If an OOF nearest-neighbor residual library is supplied, the optional
+          correction term and neighbor-similarity evidence are also shown.
         </p>
         <div class="actions">
           <a class="button-link" href="/home/prediction.html">Start Prediction</a>
@@ -1229,11 +1229,11 @@ def render_home_page() -> str:
       </div>
       <div class="card">
         <h3>Mainline</h3>
-        <p>Optuna-XGBoost trained on 82 fixed features selected from the training set.</p>
+        <p>Tuned XGBoost trained on the feature set selected from the training data.</p>
       </div>
       <div class="card">
         <h3>Output</h3>
-        <p>Base prediction, OOF-NN correction, similarity evidence, and final wavelength.</p>
+        <p>Base prediction, optional OOF-NN correction, similarity evidence, and final wavelength.</p>
       </div>
     </section>
     """
@@ -1281,7 +1281,7 @@ def render_prediction_page() -> str:
         <div class="detail-list">
           <div class="detail-row">
             <div class="detail-key">Model</div>
-            <div class="detail-value" id="modelValue">Optuna-XGBoost + OOF-NN correction</div>
+            <div class="detail-value" id="modelValue">Tuned XGBoost</div>
           </div>
           <div class="detail-row">
             <div class="detail-key">Solvent</div>
@@ -1371,28 +1371,28 @@ def render_explanation_page() -> str:
           <div class="step-num">1</div>
           <div>
             <h3>Data and feature construction</h3>
-            <p>The curated dataset contains 1033 molecule-solvent records. Each input is represented by Morgan fingerprints, selected RDKit fragment counts, and solvent one-hot encoding, giving 2095 initial candidate features.</p>
+            <p>The user-provided molecule-solvent table is cleaned and converted into Morgan fingerprints, RDKit fragment-count features, and solvent one-hot features.</p>
           </div>
         </div>
         <div class="guide-step">
           <div class="step-num">2</div>
           <div>
             <h3>Training-set feature screening</h3>
-            <p>The data are split into a fixed 80/20 training-test split. Feature filtering and recursive feature elimination are performed only within the training set, producing a fixed 82-feature mainline input.</p>
+            <p>The data are split into training and held-out test subsets. Feature filtering and recursive feature elimination are performed only on the training set, producing the fixed feature table used by the retrained model.</p>
           </div>
         </div>
         <div class="guide-step">
           <div class="step-num">3</div>
           <div>
             <h3>Candidate model comparison</h3>
-            <p>Eight regressors are compared by 10-fold cross-validation on the training set: CatBoost, XGBoost, LightGBM, RF, GBR, KNN, KRR, and SVR. XGBoost is retained as the final base model.</p>
+            <p>Eight regressors are compared by 10-fold cross-validation on the training set: CatBoost, XGBoost, LightGBM, RF, GBR, KNN, KRR, and SVR. The best-performing model can then be selected as the final base model; the template uses XGBoost.</p>
           </div>
         </div>
         <div class="guide-step">
           <div class="step-num">4</div>
           <div>
             <h3>Final prediction and residual correction</h3>
-            <p>The deployed model uses Optuna-tuned XGBoost plus a gated OOF nearest-neighbor residual correction. The correction uses k=10, shrink=1.1, a maximum-similarity gate of 0.5, and a correction cap of 40 nm.</p>
+            <p>The default workflow trains a tuned XGBoost base model. If users add an OOF residual library, the web app applies a gated nearest-neighbor correction using the parameters supplied in NN_Residual_Correction_Config.json.</p>
           </div>
         </div>
       </div>
