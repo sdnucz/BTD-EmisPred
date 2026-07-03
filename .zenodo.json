@@ -1,0 +1,29 @@
+{
+  "title": "BTD-EmisPred: machine learning workflow and cleaned dataset for NIR-II emission wavelength prediction",
+  "upload_type": "software",
+  "description": "BTD-EmisPred provides a retrainable machine-learning workflow and lightweight web app for near-infrared-II fluorescence emission wavelength prediction from molecular SMILES and solvent labels. This release includes the cleaned molecule-solvent emission dataset, feature construction code, candidate model comparison workflow, XGBoost training workflow, and web application framework.",
+  "creators": [
+    {
+      "name": "Chen, Zhuo"
+    }
+  ],
+  "access_right": "open",
+  "license": "bsd-3-clause",
+  "version": "1.0.0",
+  "keywords": [
+    "NIR-II fluorescence",
+    "emission wavelength prediction",
+    "machine learning",
+    "XGBoost",
+    "molecular fingerprints",
+    "solvent effects",
+    "BTD"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/sdnucz/BTD-EmisPred",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

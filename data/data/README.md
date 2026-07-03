@@ -14,3 +14,8 @@ Columns:
 - `doi`: literature source DOI where available.
 
 The default training and prediction configs point to this file. If you replace it with your own dataset, update `paths.raw_data_file`, `pipeline.target_col`, `pipeline.smiles_col`, and `pipeline.solvent_col` in the YAML files.
+
+## License
+
+This cleaned dataset is provided for academic reuse under CC BY 4.0. Please cite
+the original literature sources listed in the `doi` column where appropriate.

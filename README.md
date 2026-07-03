@@ -293,13 +293,19 @@ run.
 
 ## Citation
 
-If you use this repository, please cite the associated manuscript. Citation
-details will be updated after publication.
+If you use this repository, please cite the archived software release. A Zenodo
+DOI will be added after the first GitHub release is archived.
+
+```text
+Chen, Z. (2026). BTD-EmisPred: machine learning workflow and cleaned dataset for
+NIR-II emission wavelength prediction (v1.0.0). Zenodo. DOI to be added.
+```
 
 ## License
 
-No open-source license has been specified yet. Please contact the authors before
-redistributing derived model artifacts or using them in a commercial setting.
+The source code is released under the BSD 3-Clause License. The cleaned dataset
+in `data/data/nir2_emission_dataset.csv` is provided for academic reuse under
+CC BY 4.0, with literature DOI provenance retained in the `doi` column.
 
 ## Contact
 

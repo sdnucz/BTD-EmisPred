@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use BTD-EmisPred, please cite this archived software release."
+title: "BTD-EmisPred: machine learning workflow and cleaned dataset for NIR-II emission wavelength prediction"
+version: "1.0.0"
+date-released: "2026-07-03"
+repository-code: "https://github.com/sdnucz/BTD-EmisPred"
+license: "BSD-3-Clause"
+authors:
+  - family-names: "Chen"
+    given-names: "Zhuo"
+keywords:
+  - "NIR-II fluorescence"
+  - "emission wavelength prediction"
+  - "machine learning"
+  - "XGBoost"
+  - "molecular fingerprints"
+  - "solvent effects"
