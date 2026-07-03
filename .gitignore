@@ -5,7 +5,10 @@ venv/
 .env
 .env.*
 .pytest_cache/
-data/data/
+data/data/*
+!data/data/
+!data/data/nir2_emission_dataset.csv
+!data/data/README.md
 outputs/
 models/mainline/*
 !models/mainline/.gitkeep

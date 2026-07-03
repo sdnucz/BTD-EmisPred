@@ -5,7 +5,7 @@ paths:
   base_dir: .
   # This directory must be produced by your own training run.
   output_dir: outputs/mainline_retrain
-  raw_data_file: data/your_training_data.csv
+  raw_data_file: data/data/nir2_emission_dataset.csv
   prediction_file: data/prediction/SMILES_solvent_template.csv
   trained_model_file: outputs/mainline_retrain/XGB_Final_Model.json
   selected_features_file: outputs/mainline_retrain/Final_Model_Selected_Features.csv
@@ -13,7 +13,7 @@ paths:
 
 pipeline:
   # Keep these consistent with config.train.mainline.yaml.
-  target_col: lambda_em_nm
+  target_col: λem (nm)
   absorb_col: null
   smiles_col: SMILES
   solvent_col: Solvent
