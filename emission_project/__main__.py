@@ -1,3 +1,10 @@
+"""
+Command-line entry point for the BTD-EmisPred workflow.
+
+The module reads the YAML configuration, limits CPU resources, dispatches the
+requested stage, and connects data preparation, model comparison, final model
+training, held-out testing and batch prediction.
+"""
 from __future__ import annotations
 
 from dataclasses import fields
@@ -26,6 +33,7 @@ VALID_STAGES = {"prepare", "compare", "final", "predict", "all"}
 
 
 def load_yaml_config(config_path: Path) -> dict[str, Any]:
+    """Read a YAML configuration file and return its top-level mapping."""
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
@@ -36,6 +44,7 @@ def load_yaml_config(config_path: Path) -> dict[str, Any]:
 
 
 def ensure_mapping(section_value: Any, section_name: str) -> dict[str, Any]:
+    """Normalize an optional YAML section to a dictionary and reject invalid section types."""
     if section_value is None:
         return {}
     if not isinstance(section_value, dict):
@@ -48,6 +57,9 @@ def select_dataclass_fields(
     dataclass_type: type[Any],
     section_name: str,
 ) -> dict[str, Any]:
+    """
+    Filter a YAML mapping to fields accepted by a dataclass constructor and reject unknown keys.
+    """
     valid_fields = {field.name for field in fields(dataclass_type) if field.init}
     unknown_fields = sorted(set(section_value).difference(valid_fields))
     if unknown_fields:
@@ -57,6 +69,7 @@ def select_dataclass_fields(
 
 
 def resolve_path(project_root: Path, path_value: str | Path) -> Path:
+    """Resolve an absolute path or a project-root-relative path."""
     path = Path(path_value)
     if path.is_absolute():
         return path
@@ -64,6 +77,7 @@ def resolve_path(project_root: Path, path_value: str | Path) -> Path:
 
 
 def build_path_config(project_root: Path, section_value: dict[str, Any]) -> PathConfig:
+    """Construct PathConfig from the YAML paths section and create the output directory."""
     path_values = select_dataclass_fields(section_value, PathConfig, "paths")
     base_dir = resolve_path(project_root, path_values.pop("base_dir", ".")).resolve()
     output_dir = resolve_path(project_root, path_values.pop("output_dir", "outputs/default_run")).resolve()
@@ -72,16 +86,19 @@ def build_path_config(project_root: Path, section_value: dict[str, Any]) -> Path
 
 
 def build_pipeline_config(section_value: dict[str, Any]) -> PipelineConfig:
+    """Construct PipelineConfig from the YAML pipeline section."""
     pipeline_values = select_dataclass_fields(section_value, PipelineConfig, "pipeline")
     return PipelineConfig(**pipeline_values)
 
 
 def resolve_config_path(project_root: Path) -> Path:
+    """Resolve the active configuration path from EMISSION_CONFIG or the default config name."""
     config_value = os.environ.get(CONFIG_ENV_VAR, DEFAULT_CONFIG_PATH)
     return resolve_path(project_root, config_value).resolve()
 
 
 def load_stage(section_value: dict[str, Any]) -> str:
+    """Validate and return the configured workflow stage."""
     unknown_fields = sorted(set(section_value).difference({"stage"}))
     if unknown_fields:
         unknown_text = ", ".join(unknown_fields)
@@ -95,6 +112,7 @@ def load_stage(section_value: dict[str, Any]) -> str:
 
 
 def configure_runtime_resources(config: PipelineConfig) -> Any:
+    """Set BLAS/OpenMP/threadpool limits so one Python run respects max_cpu_threads."""
     max_cpu_threads = int(config.max_cpu_threads)
     if max_cpu_threads < 1:
         raise ValueError("pipeline.max_cpu_threads must be at least 1.")
@@ -118,6 +136,7 @@ def configure_runtime_resources(config: PipelineConfig) -> Any:
 
 
 def main() -> int:
+    """Parse web app CLI arguments and run either self-test or server mode."""
     project_root = Path(__file__).resolve().parent.parent
     config_path = resolve_config_path(project_root)
     config_data = load_yaml_config(config_path)

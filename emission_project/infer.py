@@ -1,3 +1,10 @@
+"""
+Batch prediction and prediction-time feature alignment.
+
+New molecules are featurized with the same Morgan, fragment and solvent settings
+as training, then reindexed to the saved selected-feature list before model
+prediction. This protects inference from column-order mismatch.
+"""
 from __future__ import annotations
 
 import json
@@ -21,6 +28,9 @@ from .utils import (
 
 
 def normalize_smiles_input_columns(df: pd.DataFrame) -> dict[str, str]:
+    """
+    Infer logical column names in a prediction input table, including SMILES and optional solvent.
+    """
     normalized_map = {
         str(column).strip().replace("\ufeff", "").lower(): column for column in df.columns
     }
@@ -60,6 +70,18 @@ def build_prediction_features(
     config: PipelineConfig,
     selected_features: list[str] | None = None,
 ) -> tuple[pd.DataFrame, list[tuple[int, str]]]:
+    """
+    Featurize prediction rows and align them to the saved training feature order.
+
+    Args:
+        smiles_df: User prediction table.
+        mapping: Logical-to-actual column mapping.
+        config: Feature-generation settings matching training.
+        selected_features: Optional saved feature names used for deployment.
+
+    Returns:
+        A feature dataframe and a list of invalid SMILES rows.
+    """
     invalid_smiles: list[tuple[int, str]] = []
     feature_rows: list[np.ndarray] = []
 
@@ -111,6 +133,7 @@ def build_prediction_features(
 
 
 def load_selected_features(selected_features_path: Path) -> list[str]:
+    """Load the saved selected-feature table produced by training."""
     if not selected_features_path.exists():
         raise FileNotFoundError(f"Selected feature file not found: {selected_features_path}")
 
@@ -126,6 +149,7 @@ def load_selected_features(selected_features_path: Path) -> list[str]:
 
 
 def validate_prediction_artifacts(paths: PathConfig, config: PipelineConfig, selected_features: list[str]) -> None:
+    """Check that model, selected features and prediction input files exist before inference."""
     metadata_path = paths.artifact_metadata
     configured_feature_names = set(
         get_feature_column_names(
@@ -205,6 +229,7 @@ def validate_prediction_artifacts(paths: PathConfig, config: PipelineConfig, sel
 
 
 def load_prediction_artifacts(paths: PathConfig, config: PipelineConfig) -> tuple[Any, list[str]]:
+    """Load the persisted final model and selected feature order for prediction."""
     artifact_metadata: dict[str, Any] = {}
     if paths.artifact_metadata.exists():
         artifact_metadata = json.loads(paths.artifact_metadata.read_text(encoding="utf-8"))
@@ -228,6 +253,7 @@ def run_prediction_workflow(
     paths: PathConfig,
     config: PipelineConfig,
 ) -> tuple[pd.DataFrame, pd.DataFrame, list[tuple[int, str]]]:
+    """Run batch prediction and export predicted emission wavelengths for each input molecule."""
     smiles_df = robust_read_csv(paths.prediction_data)
     mapping = normalize_smiles_input_columns(smiles_df)
     feature_df, invalid_smiles = build_prediction_features(smiles_df, mapping, config, selected_features)
@@ -263,6 +289,7 @@ def run_prediction_shap_analysis(
     paths: PathConfig,
     config: PipelineConfig,
 ) -> None:
+    """Generate per-molecule SHAP summaries for a limited number of prediction rows."""
     explainability_model, explainability_mode = resolve_explainability_model(model)
     if explainability_model is None:
         (paths.output_dir / "Prediction_Explainability_Notice.txt").write_text(

@@ -1,3 +1,10 @@
+"""
+Held-out test evaluation and explainability outputs.
+
+This module evaluates the trained model on the fixed test partition, exports
+metrics and error tables, and builds SHAP-based feature importance and
+substructure mapping files for manuscript interpretation.
+"""
 from __future__ import annotations
 
 import json
@@ -26,6 +33,7 @@ from .utils import (
 
 
 def extract_model_hyperparameters(model: Any) -> dict[str, Any]:
+    """Return a compact dictionary of trained model hyperparameters for run metadata."""
     if isinstance(model, MeanRegressorEnsemble):
         return {
             "ensemble_mode": "mean",
@@ -68,6 +76,9 @@ def run_shap_analysis(
     paths: PathConfig,
     config: PipelineConfig,
 ) -> pd.DataFrame:
+    """
+    Run TreeSHAP on a sample of the held-out test set and export feature-importance tables and plots.
+    """
     explainability_model, explainability_mode = resolve_explainability_model(model)
     if explainability_model is None:
         raise ValueError(f"SHAP analysis is not available for final model '{get_model_display_name(model)}'.")
@@ -122,6 +133,7 @@ def run_shap_analysis(
 
 
 def extract_substructure_smarts(bit_name: str, smiles_library: list[str], config: PipelineConfig) -> str | None:
+    """Map a Morgan or MACCS feature name back to an example SMARTS substructure when possible."""
     if str(bit_name).startswith("MACCS_"):
         try:
             return get_maccs_key_smarts(int(str(bit_name).split("_")[-1]))
@@ -172,6 +184,7 @@ def build_top_feature_substructure_table(
     config: PipelineConfig,
     top_n: int = 20,
 ) -> pd.DataFrame:
+    """Combine SHAP importance, effect direction and substructure mappings for top features."""
     top_features = feature_importance.head(top_n).copy().reset_index(drop=True)
     smiles_library = prepared.raw_df[config.smiles_col].dropna().astype(str).tolist()
     top_features["Feature_Source"] = top_features["Feature"].apply(
@@ -215,6 +228,7 @@ def save_top_feature_substructure_outputs(
     paths: PathConfig,
     config: PipelineConfig,
 ) -> None:
+    """Write top-feature substructure tables and structure plots for interpretability."""
     top_features = build_top_feature_substructure_table(feature_importance, prepared, config, top_n=20)
     save_dataframe(top_features, paths.output_dir / "Top20_Feature_Substructure_Mapping.csv")
     plot_top_feature_substructures(top_features, paths.output_dir / "Top20_Feature_Structure_RealData_Fixed.png")
@@ -226,6 +240,7 @@ def save_test_error_analysis(
     y_pred: np.ndarray,
     output_path: Path,
 ) -> None:
+    """Export sample-level held-out test errors with absolute and relative error columns."""
     residuals = y_pred - y_true
     error_df = test_metadata_df.copy()
     error_df["Experimental_em_nm"] = y_true
@@ -248,6 +263,9 @@ def save_run_metadata(
     metrics: dict[str, float],
     output_path: Path,
 ) -> None:
+    """
+    Write a JSON record of model type, feature counts, split sizes, metrics and explainability settings.
+    """
     explainability_model, explainability_mode = resolve_explainability_model(model)
     feature_summary_df = build_feature_selection_summary(
         prepared.all_df,
@@ -316,6 +334,18 @@ def evaluate_model_on_test(
     paths: PathConfig,
     config: PipelineConfig,
 ) -> dict[str, float]:
+    """
+    Evaluate the final model once on the held-out test partition.
+
+    Args:
+        model: Fitted final estimator.
+        prepared: PreparedData with selected test rows and metadata.
+        paths: Output directory for metrics, curves and interpretability files.
+        config: Pipeline settings including target column and SHAP limits.
+
+    Returns:
+        Regression metrics for the held-out test set.
+    """
     x_test = prepared.test_df[prepared.selected_features].values
     y_test = prepared.test_df[config.target_col].values
     y_test_pred = model.predict(x_test)

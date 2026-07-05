@@ -1,3 +1,10 @@
+"""
+Model factories and model artifact I/O.
+
+This file defines the candidate regressors used during model selection, the
+mainline XGBoost builder, optional mean-ensemble helpers, and save/load functions
+for persisted trained models.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -37,10 +44,15 @@ FINAL_XGB_BASE_PARAMS = {
 
 
 class MeanRegressorEnsemble(BaseEstimator, RegressorMixin):
+    """
+    Simple sklearn-compatible ensemble that averages predictions from fitted base regressors.
+    """
     def __init__(self, estimators: list[tuple[str, Any]] | None = None) -> None:
+        """Store unfitted base estimators as name-estimator pairs."""
         self.estimators = estimators
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "MeanRegressorEnsemble":
+        """Clone and fit each base estimator on the same feature matrix and target vector."""
         if not self.estimators:
             raise ValueError("MeanRegressorEnsemble requires at least one base estimator.")
 
@@ -52,6 +64,7 @@ class MeanRegressorEnsemble(BaseEstimator, RegressorMixin):
         return self
 
     def predict(self, x: np.ndarray) -> np.ndarray:
+        """Average predictions from all fitted base estimators."""
         if not hasattr(self, "estimators_") or not self.estimators_:
             raise ValueError("MeanRegressorEnsemble must be fitted before prediction.")
         predictions = [estimator.predict(x) for _, estimator in self.estimators_]
@@ -59,12 +72,23 @@ class MeanRegressorEnsemble(BaseEstimator, RegressorMixin):
 
     @property
     def named_estimators_(self) -> dict[str, Any]:
+        """Return fitted estimators as a name-to-estimator mapping."""
         if not hasattr(self, "estimators_"):
             return {}
         return dict(self.estimators_)
 
 
 def build_model_specs(random_state: int, max_cpu_threads: int) -> dict[str, tuple[Any, dict[str, list[Any]]]]:
+    """
+    Build candidate models and grid-search spaces for model selection.
+
+    Args:
+        random_state: Seed used by stochastic estimators.
+        max_cpu_threads: Per-model CPU thread limit.
+
+    Returns:
+        Mapping from model name to an estimator and parameter grid for GridSearchCV.
+    """
     specs: dict[str, tuple[Any, dict[str, list[Any]]]] = {}
 
     if CatBoostRegressor is not None:
@@ -178,6 +202,7 @@ def build_model_specs(random_state: int, max_cpu_threads: int) -> dict[str, tupl
 
 
 def build_final_xgb_param_distributions() -> dict[str, list[Any]]:
+    """Return the randomized-search space used for final XGBoost tuning."""
     return {
         "n_estimators": [200, 300, 400, 600],
         "max_depth": [3, 4, 5, 6],
@@ -196,6 +221,7 @@ def build_final_xgb(
     max_cpu_threads: int,
     param_overrides: dict[str, Any] | None = None,
 ) -> XGBRegressor:
+    """Build the mainline XGBRegressor with default parameters plus optional overrides."""
     params = dict(FINAL_XGB_BASE_PARAMS)
     if param_overrides:
         params.update(param_overrides)
@@ -211,6 +237,7 @@ def build_final_xgb(
 
 
 def build_final_lgbm(random_state: int, max_cpu_threads: int) -> LGBMRegressor:
+    """Build the LightGBM regressor used in candidate comparison or ensembles."""
     return LGBMRegressor(
         n_estimators=400,
         learning_rate=0.05,
@@ -224,6 +251,7 @@ def build_final_lgbm(random_state: int, max_cpu_threads: int) -> LGBMRegressor:
 
 
 def build_final_cat(random_state: int, max_cpu_threads: int) -> Any:
+    """Build the CatBoost regressor used in candidate comparison or ensembles."""
     if CatBoostRegressor is None:
         raise ModuleNotFoundError("CatBoost is required for the CAT base model.")
     return CatBoostRegressor(
@@ -240,6 +268,7 @@ def build_final_cat(random_state: int, max_cpu_threads: int) -> Any:
 
 
 def build_final_rf(random_state: int, max_cpu_threads: int) -> RandomForestRegressor:
+    """Build the Random Forest regressor used in candidate comparison or ensembles."""
     return RandomForestRegressor(
         n_estimators=200,
         max_depth=None,
@@ -255,6 +284,7 @@ def build_final_mean_ensemble(
     max_cpu_threads: int,
     xgb_param_overrides: dict[str, Any] | None = None,
 ) -> MeanRegressorEnsemble:
+    """Build an averaging ensemble from selected base algorithm names."""
     builders = {
         "XGB": lambda: build_final_xgb(random_state, max_cpu_threads, xgb_param_overrides),
         "CAT": lambda: build_final_cat(random_state, max_cpu_threads),
@@ -274,6 +304,7 @@ def build_final_mean_ensemble(
 
 
 def get_model_artifact_type(model: RegressorMixin) -> str:
+    """Return the artifact type string used to decide how a fitted model is saved."""
     if isinstance(model, XGBRegressor):
         return "xgb"
     if isinstance(model, MeanRegressorEnsemble):
@@ -282,6 +313,7 @@ def get_model_artifact_type(model: RegressorMixin) -> str:
 
 
 def save_final_model(model: RegressorMixin, model_path: Path) -> None:
+    """Save XGBoost models as JSON and other sklearn-compatible models with joblib."""
     model_path.parent.mkdir(parents=True, exist_ok=True)
     if isinstance(model, XGBRegressor):
         model.save_model(model_path)
@@ -290,6 +322,7 @@ def save_final_model(model: RegressorMixin, model_path: Path) -> None:
 
 
 def load_final_model(model_path: Path) -> RegressorMixin:
+    """Load a persisted model artifact from JSON or joblib format."""
     if not model_path.exists():
         raise FileNotFoundError(f"Saved model not found: {model_path}")
     if model_path.suffix.lower() == ".json":
@@ -298,6 +331,7 @@ def load_final_model(model_path: Path) -> RegressorMixin:
 
 
 def get_model_display_name(model: RegressorMixin) -> str:
+    """Return a human-readable model name for reports and the web app."""
     if isinstance(model, XGBRegressor):
         return "XGBoost"
     if isinstance(model, MeanRegressorEnsemble):
@@ -307,6 +341,9 @@ def get_model_display_name(model: RegressorMixin) -> str:
 
 
 def resolve_explainability_model(model: RegressorMixin) -> tuple[XGBRegressor | None, str]:
+    """
+    Return the XGBoost estimator that can be explained by TreeSHAP, including ensemble proxies.
+    """
     if isinstance(model, XGBRegressor):
         return model, "final_model"
     if isinstance(model, MeanRegressorEnsemble):
@@ -317,6 +354,7 @@ def resolve_explainability_model(model: RegressorMixin) -> tuple[XGBRegressor | 
 
 
 def load_final_xgb(model_path: Path) -> XGBRegressor:
+    """Load an XGBRegressor from an XGBoost JSON model file."""
     if not model_path.exists():
         raise FileNotFoundError(f"Saved XGBoost model not found: {model_path}")
 

@@ -1,3 +1,12 @@
+"""
+Dataset preparation for BTD-EmisPred.
+
+This module cleans the molecule-solvent table, constructs Morgan fingerprint,
+RDKit fragment-count and solvent one-hot features, performs the train/test split,
+and applies feature selection using only the training partition. The selected
+feature names produced here are later saved with the model and reused for
+prediction-time feature alignment.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -30,6 +39,9 @@ from emission_project.utils import (
 
 @dataclass(frozen=True)
 class PathConfig:
+    """
+    Stores repository-relative paths for raw data, prediction inputs, trained models, selected features and metadata.
+    """
     base_dir: Path
     output_dir: Path
     raw_data_file: str = "data/data/data.csv"
@@ -39,6 +51,9 @@ class PathConfig:
     artifact_metadata_file: str = "outputs/default_run/Model_Artifacts_Metadata.json"
 
     def _resolve_input_file(self, file_name: str, candidate_dirs: list[str]) -> Path:
+        """
+        Resolve an input file path, allowing either an explicit path or a basename under common data directories.
+        """
         configured_path = Path(file_name)
         if configured_path.is_absolute():
             candidates = [configured_path]
@@ -52,6 +67,9 @@ class PathConfig:
         return candidates[0]
 
     def _resolve_configured_path(self, file_name: str) -> Path:
+        """
+        Resolve a configured output path relative to the project base directory when it is not absolute.
+        """
         configured_path = Path(file_name)
         if configured_path.is_absolute():
             return configured_path
@@ -59,27 +77,35 @@ class PathConfig:
 
     @property
     def raw_data(self) -> Path:
+        """Return the resolved training dataset path."""
         return self._resolve_input_file(self.raw_data_file, ["data", "data/data"])
 
     @property
     def prediction_data(self) -> Path:
+        """Return the resolved batch-prediction input path."""
         return self._resolve_input_file(self.prediction_file, ["data", "data/prediction"])
 
     @property
     def trained_model(self) -> Path:
+        """Return the resolved trained-model artifact path."""
         return self._resolve_configured_path(self.trained_model_file)
 
     @property
     def selected_features_data(self) -> Path:
+        """Return the resolved selected-feature table path."""
         return self._resolve_configured_path(self.selected_features_file)
 
     @property
     def artifact_metadata(self) -> Path:
+        """Return the resolved model metadata path."""
         return self._resolve_configured_path(self.artifact_metadata_file)
 
 
 @dataclass(frozen=True)
 class PipelineConfig:
+    """
+    Holds all modeling options, including column names, feature blocks, split settings, feature-selection controls and final model settings.
+    """
     target_col: str = "λem (nm)"
     absorb_col: str | None = None
     smiles_col: str = "SMILES"
@@ -119,6 +145,9 @@ class PipelineConfig:
 
 @dataclass
 class PreparedData:
+    """
+    Container returned by prepare_datasets with raw data, metadata, feature matrices, selected features and train/test partitions.
+    """
     raw_df: pd.DataFrame
     metadata_df: pd.DataFrame
     all_df: pd.DataFrame
@@ -136,6 +165,7 @@ class PreparedData:
 
 
 def get_optional_absorb_col(config: PipelineConfig) -> str | None:
+    """Return the absorbance column name only when it is configured and non-empty."""
     if config.absorb_col is None:
         return None
     absorb_col = str(config.absorb_col).strip()
@@ -143,6 +173,7 @@ def get_optional_absorb_col(config: PipelineConfig) -> str | None:
 
 
 def get_optional_solvent_col(config: PipelineConfig) -> str | None:
+    """Return the solvent column name only when solvent one-hot features are enabled."""
     if not config.use_solvent_features:
         return None
     if config.solvent_col is None:
@@ -152,6 +183,9 @@ def get_optional_solvent_col(config: PipelineConfig) -> str | None:
 
 
 def get_model_value_columns(config: PipelineConfig) -> list[str]:
+    """
+    Return the non-feature value columns that must stay with the model matrix, including the target and optional solvent/absorbance fields.
+    """
     columns: list[str] = []
     absorb_col = get_optional_absorb_col(config)
     if absorb_col is not None:
@@ -161,6 +195,7 @@ def get_model_value_columns(config: PipelineConfig) -> list[str]:
 
 
 def get_metadata_columns(config: PipelineConfig) -> list[str]:
+    """Return source columns kept for sample tracking and error analysis."""
     columns = [config.smiles_col]
     absorb_col = get_optional_absorb_col(config)
     if absorb_col is not None:
@@ -173,6 +208,16 @@ def get_metadata_columns(config: PipelineConfig) -> list[str]:
 
 
 def validate_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> None:
+    """
+    Validate that the raw dataframe has the columns required by the configured model.
+
+    Args:
+        df: Input dataframe read from the training CSV.
+        config: Pipeline configuration containing column names and feature flags.
+
+    Returns:
+        None. Raises ValueError when required columns are missing.
+    """
     required_columns = {config.smiles_col, config.target_col}
     absorb_col = get_optional_absorb_col(config)
     if absorb_col is not None:
@@ -189,6 +234,17 @@ def validate_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> None:
 
 
 def clean_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
+    """
+    Clean raw rows before featurization.
+
+    Args:
+        df: Raw molecule-solvent table.
+        config: Pipeline configuration with SMILES, target and solvent column names.
+
+    Returns:
+        A filtered dataframe with valid SMILES, numeric emission labels, optional
+        numeric absorbance values and normalized solvent labels.
+    """
     cleaned_df = df.copy()
     cleaned_df[config.smiles_col] = cleaned_df[config.smiles_col].astype("string").str.strip()
     cleaned_df[config.target_col] = pd.to_numeric(cleaned_df[config.target_col], errors="coerce")
@@ -214,6 +270,7 @@ def clean_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
 
 
 def first_non_null_value(series: pd.Series) -> Any:
+    """Return the first non-null value in a grouped metadata series."""
     non_null = series.dropna()
     if non_null.empty:
         return series.iloc[0] if not series.empty else None
@@ -221,6 +278,13 @@ def first_non_null_value(series: pd.Series) -> Any:
 
 
 def deduplicate_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
+    """
+    Collapse duplicate molecule records before model training.
+
+    Duplicates are keyed by canonical SMILES and, when solvent features are enabled,
+    by the normalized solvent label. Target values are averaged, while metadata uses
+    the first non-null value.
+    """
     if not config.deduplicate_smiles:
         return df.reset_index(drop=True)
 
@@ -258,6 +322,17 @@ def build_feature_tables(
     raw_df: pd.DataFrame,
     config: PipelineConfig,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Construct full model and helper feature tables from cleaned molecules.
+
+    Args:
+        raw_df: Cleaned dataframe containing SMILES, target and optional solvent.
+        config: Feature-generation configuration.
+
+    Returns:
+        model_df with features plus model value columns, and helper_df with features
+        plus metadata columns for later plots and error analysis.
+    """
     feature_rows = [
         smiles_to_feature_vector(
             smiles,
@@ -304,6 +379,12 @@ def stratified_split(
     df: pd.DataFrame,
     config: PipelineConfig,
 ) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray]:
+    """
+    Split the full feature table into train and held-out test partitions.
+
+    The split is stratified by emission-wavelength quantile bins when enough label
+    variety exists; otherwise it falls back to a shuffled random split.
+    """
     indices = np.arange(len(df))
     stratify_bins = min(config.stratify_bins, df[config.target_col].nunique())
     if stratify_bins < 2:
@@ -328,6 +409,7 @@ def stratified_split(
 
 
 def variance_filter(train_df: pd.DataFrame) -> tuple[pd.DataFrame, list[str], list[str]]:
+    """Remove zero-variance features using only the training partition."""
     features = feature_columns(train_df)
     targets = target_columns(train_df)
     variances = train_df[features].var()
@@ -341,6 +423,13 @@ def correlation_filter(
     train_df: pd.DataFrame,
     threshold: float,
 ) -> tuple[pd.DataFrame, list[str], list[str]]:
+    """
+    Remove highly similar features using only the training partition.
+
+    Features are considered in decreasing variance order. A candidate feature is kept
+    only when its maximum absolute correlation to already-kept features is below the
+    configured similarity threshold.
+    """
     features = feature_columns(train_df)
     targets = target_columns(train_df)
     corr_matrix = train_df[features].corr().abs()
@@ -370,6 +459,12 @@ def rfe_select_features(
     random_state: int,
     max_cpu_threads: int,
 ) -> tuple[pd.DataFrame, list[str], list[str]]:
+    """
+    Select a fixed number of features by recursive feature elimination on training data.
+
+    A RandomForestRegressor ranks candidate features after scaling. The validation and
+    test partitions are never used to decide which features survive this step.
+    """
     features = feature_columns(train_df)
     targets = target_columns(train_df)
     n_selected = min(n_selected_features, len(features))
@@ -399,12 +494,14 @@ def rfe_select_features(
 
 
 def build_sample_metadata(raw_df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
+    """Build a row-level metadata table with stable sample IDs for later exports."""
     metadata_df = raw_df[get_metadata_columns(config)].copy().reset_index(drop=True)
     metadata_df.insert(0, "Sample_ID", np.arange(1, len(metadata_df) + 1))
     return metadata_df
 
 
 def resolve_fixed_feature_list_path(paths: PathConfig, config: PipelineConfig) -> Path | None:
+    """Resolve an optional pre-defined feature list path from the config."""
     if config.fixed_feature_list_file is None:
         return None
     configured_path = Path(str(config.fixed_feature_list_file))
@@ -414,6 +511,9 @@ def resolve_fixed_feature_list_path(paths: PathConfig, config: PipelineConfig) -
 
 
 def load_fixed_feature_list(feature_list_path: Path, available_features: list[str]) -> list[str]:
+    """
+    Load and validate a fixed selected-feature list against features available in the current run.
+    """
     if not feature_list_path.exists():
         raise FileNotFoundError(f"Fixed feature list file not found: {feature_list_path}")
 
@@ -447,6 +547,9 @@ def build_feature_selection_summary(
     train_fxx_df: pd.DataFrame,
     final_feature_count: int | None = None,
 ) -> pd.DataFrame:
+    """
+    Summarize the number of samples and features retained after each feature-selection stage.
+    """
     initial_feature_count = len(feature_columns(all_df))
     variance_feature_count = len(feature_columns(train_f_df))
     correlation_feature_count = len(feature_columns(train_fx_df))
@@ -492,6 +595,7 @@ def build_feature_selection_summary(
 
 
 def compute_vif_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute variance inflation factor diagnostics for selected features."""
     features = feature_columns(df)
     if not features:
         return pd.DataFrame(columns=["Feature", "VIF", "Tolerance", "Max_Abs_PairCorr", "VIF_Level"])
@@ -558,6 +662,7 @@ def vif_filter_features(
     vif_threshold: float,
     min_features_after_vif: int,
 ) -> tuple[pd.DataFrame, list[str], list[str], pd.DataFrame, pd.DataFrame]:
+    """Iteratively remove high-VIF features while preserving a minimum feature count."""
     features = feature_columns(train_df)
     targets = target_columns(train_df)
     current_features = features.copy()
@@ -595,6 +700,24 @@ def vif_filter_features(
 
 
 def prepare_datasets(paths: PathConfig, config: PipelineConfig) -> PreparedData:
+    """
+    Run the full data-preparation and feature-selection workflow.
+
+    Args:
+        paths: Resolved input/output paths.
+        config: Pipeline configuration.
+
+    Returns:
+        PreparedData containing cleaned data, metadata, train/test splits, selected
+        features and VIF diagnostics.
+
+    Key ML flow:
+        The test set is split before feature selection. Variance filtering,
+        correlation filtering, RFE and optional VIF filtering are all fitted only on
+        the training partition, then the final selected feature names are applied to
+        both train and test matrices. This prevents direct leakage from the held-out
+        test labels into feature selection.
+    """
     raw_df = robust_read_csv(paths.raw_data)
     validate_raw_dataset(raw_df, config)
     raw_df = clean_raw_dataset(raw_df, config)
@@ -605,6 +728,9 @@ def prepare_datasets(paths: PathConfig, config: PipelineConfig) -> PreparedData:
     train_df, test_df, train_indices, test_indices = stratified_split(all_df, config)
     train_metadata_df = metadata_df.iloc[train_indices].reset_index(drop=True)
     test_metadata_df = metadata_df.iloc[test_indices].reset_index(drop=True)
+    # Feature selection is intentionally fitted on train_df only. The held-out
+    # test_df is reduced later by column name so test labels never influence the
+    # variance, correlation, RFE or VIF decisions.
     train_f_df, _, _ = variance_filter(train_df)
     train_fx_df, _, _ = correlation_filter(train_f_df, config.similarity_threshold)
     fixed_feature_list_path = resolve_fixed_feature_list_path(paths, config)

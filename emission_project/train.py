@@ -1,3 +1,11 @@
+"""
+Model comparison and final model training utilities.
+
+The comparison stage evaluates candidate regressors by cross-validation on the
+training set. The final stage fits the configured mainline model on the complete
+training partition and saves the model, selected feature list and metadata needed
+for reproducible prediction.
+"""
 from __future__ import annotations
 
 import json
@@ -25,8 +33,26 @@ def run_model_comparison(
     paths: PathConfig,
     config: PipelineConfig,
 ) -> pd.DataFrame:
+    """
+    Compare candidate regressors using cross-validation inside the training set.
+
+    Args:
+        prepared: Prepared training/test data and selected features.
+        paths: Output paths for comparison tables and plots.
+        config: CV fold counts, random seed and model settings.
+
+    Returns:
+        A dataframe summarizing mean and standard deviation of r, R2, RMSE and MAE.
+
+    Key ML flow:
+        The outer KFold creates validation folds only from the training partition.
+        Inside each outer fold, GridSearchCV tunes hyperparameters on that fold's
+        training subset. The held-out project test set is not used in model selection.
+    """
     x = prepared.train_model_df[prepared.selected_features].values
     y = prepared.train_model_df[config.target_col].values
+    # Model selection happens inside the training partition. The project-level
+    # held-out test set is evaluated only after a final model has been chosen.
     outer_cv = KFold(n_splits=config.outer_folds, shuffle=True, random_state=config.random_state)
     model_specs = build_model_specs(config.random_state, config.max_cpu_threads)
 
@@ -41,6 +67,9 @@ def run_model_comparison(
             x_train, x_valid = x[train_index], x[valid_index]
             y_train, y_valid = y[train_index], y[valid_index]
 
+            # Inner CV tunes hyperparameters using only the outer-fold training
+            # subset; the outer-fold validation subset estimates model-selection
+            # performance.
             search = GridSearchCV(
                 estimator=estimator,
                 param_grid=param_grid,
@@ -77,6 +106,7 @@ def run_model_comparison(
 
 
 def save_final_tuning_results(search: RandomizedSearchCV, paths: PathConfig) -> None:
+    """Export the RandomizedSearchCV candidate table and best XGBoost parameters."""
     cv_results_df = pd.DataFrame(search.cv_results_)
     param_columns = [column for column in cv_results_df.columns if column.startswith("param_")]
     export_columns = [
@@ -109,6 +139,17 @@ def save_final_tuning_results(search: RandomizedSearchCV, paths: PathConfig) -> 
 
 
 def train_final_model(prepared: PreparedData, paths: PathConfig, config: PipelineConfig) -> Any:
+    """
+    Fit the final configured model on the complete training partition.
+
+    Args:
+        prepared: PreparedData containing train_model_df and selected features.
+        paths: Output paths for optional tuning files.
+        config: Final model type and hyperparameter-search settings.
+
+    Returns:
+        A fitted estimator. For the mainline workflow this is an XGBRegressor.
+    """
     x_train = prepared.train_model_df[prepared.selected_features].values
     y_train = prepared.train_model_df[config.target_col].values
     final_model_type = str(config.final_model_type).strip().lower()
@@ -161,6 +202,7 @@ def save_training_artifacts(
     paths: PathConfig,
     config: PipelineConfig,
 ) -> None:
+    """Persist the fitted model, selected feature order and metadata required for prediction."""
     paths.trained_model.parent.mkdir(parents=True, exist_ok=True)
     paths.selected_features_data.parent.mkdir(parents=True, exist_ok=True)
     paths.artifact_metadata.parent.mkdir(parents=True, exist_ok=True)

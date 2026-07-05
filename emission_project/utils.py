@@ -1,3 +1,10 @@
+"""
+Shared chemistry, metric, plotting and file utilities.
+
+The utilities in this module convert SMILES strings into RDKit molecules,
+Morgan fingerprints, descriptor vectors, fragment-count vectors and solvent
+features, then provide common regression metrics and manuscript-style plots.
+"""
 from __future__ import annotations
 
 import re
@@ -85,18 +92,24 @@ FRAGMENT_COUNT_FUNCTIONS = {
 
 @lru_cache(maxsize=None)
 def get_morgan_generator(radius: int, n_bits: int) -> rdFingerprintGenerator.FingerprintGenerator64:
+    """
+    Return a cached RDKit Morgan fingerprint generator for the requested radius and bit length.
+    """
     return rdFingerprintGenerator.GetMorganGenerator(radius=radius, fpSize=n_bits)
 
 
 def feature_columns(df: pd.DataFrame) -> list[str]:
+    """Return model feature columns by known feature prefixes."""
     return [column for column in df.columns if column.startswith(FEATURE_PREFIXES)]
 
 
 def target_columns(df: pd.DataFrame) -> list[str]:
+    """Return non-feature columns carried alongside model matrices."""
     return [column for column in df.columns if not column.startswith(FEATURE_PREFIXES)]
 
 
 def normalize_solvent_label(value: Any) -> str:
+    """Standardize solvent labels to compact uppercase aliases used for one-hot encoding."""
     if pd.isna(value):
         return ""
     text = str(value).strip()
@@ -109,6 +122,7 @@ def normalize_solvent_label(value: Any) -> str:
 
 
 def solvent_to_feature_name(solvent: Any) -> str:
+    """Convert a normalized solvent label into a Solvent_* feature column name."""
     solvent_label = normalize_solvent_label(solvent)
     token = re.sub(r"[^A-Za-z0-9]+", "_", solvent_label).strip("_")
     return f"Solvent_{token or 'UNKNOWN'}"
@@ -118,6 +132,7 @@ def build_solvent_feature_frame(
     solvent_values: pd.Series,
     solvent_categories: list[str] | tuple[str, ...] | None = None,
 ) -> pd.DataFrame:
+    """Create a one-hot encoded solvent feature dataframe from raw solvent labels."""
     normalized = solvent_values.map(normalize_solvent_label)
     categories = sorted(normalized.dropna().astype(str).unique()) if solvent_categories is None else list(solvent_categories)
     feature_names = sorted(set(solvent_to_feature_name(category) for category in categories))
@@ -131,6 +146,7 @@ def build_solvent_feature_frame(
 
 
 def safe_pearsonr(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute Pearson correlation while returning NaN for degenerate inputs."""
     if len(y_true) < 2:
         return 0.0
     if np.allclose(np.std(y_true), 0) or np.allclose(np.std(y_pred), 0):
@@ -139,6 +155,7 @@ def safe_pearsonr(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    """Compute r, R2, RMSE and MAE for regression predictions."""
     return {
         "r": safe_pearsonr(y_true, y_pred),
         "R2": float(r2_score(y_true, y_pred)),
@@ -148,6 +165,7 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
 
 
 def robust_read_csv(file_path: Path) -> pd.DataFrame:
+    """Read a CSV file using common UTF encodings and fall back to GBK when needed."""
     encodings = ["utf-8-sig", "gbk", "utf-8"]
     for encoding in encodings:
         try:
@@ -158,11 +176,13 @@ def robust_read_csv(file_path: Path) -> pd.DataFrame:
 
 
 def save_dataframe(df: pd.DataFrame, path: Path) -> None:
+    """Create parent directories and save a dataframe as UTF-8 CSV."""
     df.to_csv(path, index=False, encoding="utf-8")
 
 
 @lru_cache(maxsize=None)
 def smiles_to_mol(smiles: Any) -> Chem.Mol | None:
+    """Parse a SMILES string into an RDKit molecule or return None for invalid input."""
     smiles_text = str(smiles).strip()
     if not smiles_text:
         return None
@@ -171,6 +191,7 @@ def smiles_to_mol(smiles: Any) -> Chem.Mol | None:
 
 @lru_cache(maxsize=None)
 def canonicalize_smiles(smiles: Any) -> str | None:
+    """Return canonical SMILES for valid molecules."""
     mol = smiles_to_mol(smiles)
     if mol is None:
         return None
@@ -178,6 +199,7 @@ def canonicalize_smiles(smiles: Any) -> str | None:
 
 
 def smiles_to_morgan(smiles: Any, radius: int, n_bits: int) -> np.ndarray:
+    """Convert a SMILES string into a binary Morgan fingerprint vector."""
     mol = smiles_to_mol(smiles)
     if mol is None:
         return np.zeros(n_bits, dtype=np.int8)
@@ -189,18 +211,22 @@ def smiles_to_morgan(smiles: Any, radius: int, n_bits: int) -> np.ndarray:
 
 
 def get_rdkit_descriptor_names() -> list[str]:
+    """Return the configured RDKit descriptor feature names."""
     return list(RDKIT_DESCRIPTOR_FUNCTIONS)
 
 
 def get_fragment_feature_names() -> list[str]:
+    """Return the configured RDKit fragment-count feature names."""
     return list(FRAGMENT_COUNT_FUNCTIONS)
 
 
 def get_maccs_key_names() -> list[str]:
+    """Return MACCS key feature names."""
     return [f"MACCS_{index}" for index in range(1, MACCS_KEY_COUNT + 1)]
 
 
 def get_maccs_key_smarts(key_index: int) -> str | None:
+    """Return an example SMARTS pattern for a MACCS key index when available."""
     pattern = MACCSkeys.smartsPatts.get(int(key_index))
     if pattern is None:
         return None
@@ -216,6 +242,7 @@ def get_feature_column_names(
     use_rdkit_descriptors: bool,
     use_fragment_features: bool,
 ) -> tuple[str, ...]:
+    """Return feature column names in the exact order produced by smiles_to_feature_vector."""
     column_names: list[str] = []
     if use_morgan_features:
         column_names.extend(f"Morgan_{index}" for index in range(morgan_bits))
@@ -231,12 +258,14 @@ def get_feature_column_names(
 
 
 def compute_rdkit_descriptor_vector(mol: Chem.Mol | None) -> np.ndarray:
+    """Compute numeric RDKit descriptor values for one molecule."""
     if mol is None:
         return np.zeros(len(RDKIT_DESCRIPTOR_FUNCTIONS), dtype=np.float32)
     return np.asarray([float(func(mol)) for func in RDKIT_DESCRIPTOR_FUNCTIONS.values()], dtype=np.float32)
 
 
 def compute_maccs_key_vector(mol: Chem.Mol | None) -> np.ndarray:
+    """Compute binary MACCS key values for one molecule."""
     if mol is None:
         return np.zeros(MACCS_KEY_COUNT, dtype=np.float32)
     fingerprint = MACCSkeys.GenMACCSKeys(mol)
@@ -244,6 +273,7 @@ def compute_maccs_key_vector(mol: Chem.Mol | None) -> np.ndarray:
 
 
 def compute_fragment_count_vector(mol: Chem.Mol | None) -> np.ndarray:
+    """Compute RDKit fragment-count values for one molecule."""
     if mol is None:
         return np.zeros(len(FRAGMENT_COUNT_FUNCTIONS), dtype=np.float32)
     return np.asarray([float(func(mol)) for func in FRAGMENT_COUNT_FUNCTIONS.values()], dtype=np.float32)
@@ -258,6 +288,13 @@ def smiles_to_feature_vector(
     use_rdkit_descriptors: bool,
     use_fragment_features: bool,
 ) -> tuple[np.ndarray, bool]:
+    """
+    Convert one SMILES string into the configured molecular feature vector.
+
+    The vector can include Morgan fingerprints, MACCS keys, RDKit descriptors and
+    RDKit fragment counts. Solvent one-hot features are appended later because they
+    are row/table-level values rather than molecule-only descriptors.
+    """
     mol = smiles_to_mol(smiles)
     feature_blocks: list[np.ndarray] = []
 
@@ -279,6 +316,7 @@ def smiles_to_feature_vector(
 
 
 def normalize_shap_values(shap_values: Any) -> np.ndarray:
+    """Normalize SHAP output formats to a two-dimensional numpy array."""
     if isinstance(shap_values, list):
         shap_values = shap_values[0]
     values = np.asarray(shap_values)
@@ -290,6 +328,7 @@ def normalize_shap_values(shap_values: Any) -> np.ndarray:
 
 
 def configure_plot_style() -> None:
+    """Apply shared matplotlib style settings for exported figures."""
     plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Arial"]
     plt.rcParams["axes.unicode_minus"] = False
     plt.rcParams["figure.facecolor"] = "white"
@@ -297,6 +336,7 @@ def configure_plot_style() -> None:
 
 
 def plot_feature_similarity_heatmap(df: pd.DataFrame, output_path: Path) -> None:
+    """Plot feature correlation/similarity heatmap after feature screening."""
     configure_plot_style()
     features = feature_columns(df)
     corr_matrix = df[features].corr(method="pearson")
@@ -344,6 +384,7 @@ def plot_cv_regression_curves(
     fold_predictions: dict[str, dict[str, list[float]]],
     output_dir: Path,
 ) -> None:
+    """Plot cross-validation predicted-versus-observed curves for candidate models."""
     configure_plot_style()
     model_styles = {
         "RF": {"color": "#1f77b4", "marker": "o"},
@@ -422,6 +463,7 @@ def plot_test_regression_curve(
     output_path: Path,
     title: str = "XGB Test Set",
 ) -> None:
+    """Plot held-out test predicted-versus-observed regression curve."""
     configure_plot_style()
     fig, ax = plt.subplots(figsize=(8, 6), dpi=600)
     ax.scatter(
@@ -470,6 +512,7 @@ def plot_test_regression_curve(
 
 
 def draw_substructure(smarts: str | None) -> np.ndarray | None:
+    """Draw a SMARTS substructure to an image array for interpretability tables."""
     if smarts is None:
         return None
 
@@ -505,6 +548,7 @@ def draw_substructure(smarts: str | None) -> np.ndarray | None:
 
 
 def plot_top_feature_substructures(top_features: pd.DataFrame, output_path: Path) -> None:
+    """Render top-feature substructure mappings as a manuscript-style table image."""
     fig = plt.figure(figsize=(10, 2.2 * len(top_features)), dpi=600)
     grid = gridspec.GridSpec(len(top_features) + 1, 3, width_ratios=[1, 2, 1])
 
@@ -558,6 +602,7 @@ def plot_sample_shap_contributions(
     output_path: Path,
     max_features: int,
 ) -> None:
+    """Plot the largest positive and negative SHAP contributions for one molecule."""
     top_indices = np.argsort(np.abs(shap_row))[-max_features:]
     top_values = shap_row[top_indices]
     top_features = [feature_names[index] for index in top_indices]

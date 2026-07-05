@@ -1,3 +1,11 @@
+"""
+Lightweight HTTP web application for BTD-EmisPred.
+
+The app loads a retrained model and saved feature list, accepts SMILES and solvent
+input, builds aligned features, and returns the base XGBoost prediction. If an
+OOF residual library is present, it also applies gated nearest-neighbor residual
+correction.
+"""
 from __future__ import annotations
 
 import argparse
@@ -23,6 +31,7 @@ APP_DIR = Path(__file__).resolve().parent
 
 
 def find_project_root(app_dir: Path) -> Path:
+    """Locate the repository root from the web_app directory."""
     for candidate in [app_dir, *app_dir.parents]:
         if (candidate / "emission_project").exists() and (candidate / "data").exists():
             return candidate
@@ -61,6 +70,7 @@ DEBUG_TRACEBACK = os.environ.get("DEBUG_TRACEBACK", "").strip().lower() in {"1",
 
 
 def load_yaml_config(config_path: Path) -> dict[str, Any]:
+    """Read a YAML configuration file and return its top-level mapping."""
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
     config_data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
@@ -70,6 +80,7 @@ def load_yaml_config(config_path: Path) -> dict[str, Any]:
 
 
 def ensure_mapping(section_value: Any, section_name: str) -> dict[str, Any]:
+    """Normalize an optional YAML section to a dictionary and reject invalid section types."""
     if section_value is None:
         return {}
     if not isinstance(section_value, dict):
@@ -82,6 +93,9 @@ def select_dataclass_fields(
     dataclass_type: type[Any],
     section_name: str,
 ) -> dict[str, Any]:
+    """
+    Filter a YAML mapping to fields accepted by a dataclass constructor and reject unknown keys.
+    """
     valid_fields = {field.name for field in fields(dataclass_type) if field.init}
     unknown_fields = sorted(set(section_value).difference(valid_fields))
     if unknown_fields:
@@ -91,6 +105,7 @@ def select_dataclass_fields(
 
 
 def resolve_path(project_root: Path, path_value: str | Path) -> Path:
+    """Resolve an absolute path or a project-root-relative path."""
     path = Path(path_value)
     if path.is_absolute():
         return path
@@ -98,6 +113,7 @@ def resolve_path(project_root: Path, path_value: str | Path) -> Path:
 
 
 def build_path_config(project_root: Path, section_value: dict[str, Any]) -> PathConfig:
+    """Construct PathConfig from the YAML paths section and create the output directory."""
     path_values = select_dataclass_fields(section_value, PathConfig, "paths")
     base_dir = resolve_path(project_root, path_values.pop("base_dir", ".")).resolve()
     output_dir = resolve_path(project_root, path_values.pop("output_dir", "outputs/default_run")).resolve()
@@ -106,11 +122,13 @@ def build_path_config(project_root: Path, section_value: dict[str, Any]) -> Path
 
 
 def build_pipeline_config(section_value: dict[str, Any]) -> PipelineConfig:
+    """Construct PipelineConfig from the YAML pipeline section."""
     pipeline_values = select_dataclass_fields(section_value, PipelineConfig, "pipeline")
     return PipelineConfig(**pipeline_values)
 
 
 def parse_solvent_submission(value: Any) -> str:
+    """Normalize solvent text submitted by the browser form."""
     text = str(value or "").strip().replace("\\", "/")
     if " - " in text:
         text = text.split(" - ", 1)[0].strip()
@@ -119,7 +137,16 @@ def parse_solvent_submission(value: Any) -> str:
 
 
 class NNResidualCorrector:
+    """
+    Prediction-time gated nearest-neighbor residual corrector.
+
+    The corrector expects an OOF residual library generated from training-set
+    out-of-fold predictions. For a new molecule it finds similar training molecules
+    by Morgan Tanimoto similarity, averages their true-minus-predicted residuals, and
+    adds a capped/shrunk correction to the base XGBoost prediction.
+    """
     def __init__(self, output_dir: Path, config: dict[str, Any]) -> None:
+        """Load the residual library, Morgan fingerprints, solvent labels and residual values."""
         self.output_dir = output_dir
         self.config = dict(config)
         library_path = output_dir / str(self.config.get("library_file", "NN_Residual_Correction_Library.csv"))
@@ -161,6 +188,7 @@ class NNResidualCorrector:
 
     @classmethod
     def from_output_dir(cls, output_dir: Path) -> "NNResidualCorrector | None":
+        """Create a corrector when NN residual config exists in the model output directory."""
         config_path = output_dir / "NN_Residual_Correction_Config.json"
         if not config_path.exists():
             return None
@@ -170,6 +198,17 @@ class NNResidualCorrector:
         return cls(output_dir, config)
 
     def correction_for(self, smiles: str, solvent: str) -> dict[str, Any]:
+        """
+        Compute the gated nearest-neighbor residual correction for one query.
+
+        Args:
+            smiles: Query molecule SMILES.
+            solvent: Query solvent label.
+
+        Returns:
+            A dictionary with correction value, gate status, neighbor count and similarity
+            diagnostics. If the query fails the gate, correction is zero.
+        """
         if not self.enabled:
             return self._empty_result("disabled")
 
@@ -186,6 +225,10 @@ class NNResidualCorrector:
         if candidate_indices.size == 0:
             return self._empty_result("no_candidate_neighbors")
 
+        # The residual correction uses an OOF residual library: each residual
+        # should come from a training sample predicted by a model that did not
+        # fit that sample. Similarity only decides how much local residual
+        # evidence to transfer to the new query.
         candidate_bits = self.train_bits[candidate_indices]
         intersection = candidate_bits @ query_bits
         union = self.train_bit_counts[candidate_indices] + query_count - intersection
@@ -229,6 +272,7 @@ class NNResidualCorrector:
         }
 
     def _empty_result(self, reason: str) -> dict[str, Any]:
+        """Return a zero-correction diagnostic payload for disabled or gated-out queries."""
         return {
             "nn_correction_enabled": self.enabled,
             "nn_gate_active": False,
@@ -247,7 +291,13 @@ class NNResidualCorrector:
 
 
 class MainlinePredictor:
+    """
+    Runtime predictor used by the web app to load artifacts once and serve repeated predictions.
+    """
     def __init__(self) -> None:
+        """
+        Load config, trained model, selected features, metadata, metrics and optional NN corrector.
+        """
         config_data = load_yaml_config(CONFIG_PATH)
         paths_section = ensure_mapping(config_data.get("paths"), "paths")
         pipeline_section = ensure_mapping(config_data.get("pipeline"), "pipeline")
@@ -262,18 +312,21 @@ class MainlinePredictor:
         self.solvent_options = self._load_solvent_options()
 
     def _load_json(self, path: Path) -> dict[str, Any]:
+        """Read an optional JSON file and return an empty dictionary when absent."""
         if not path.exists():
             return {}
         data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
 
     def _load_model_display(self) -> str:
+        """Choose the model display label from metadata or default text."""
         model_name = self.artifact_metadata.get("model", {}).get("name")
         if model_name:
             return str(model_name)
         return DEFAULT_MODEL_DISPLAY
 
     def _load_metrics(self) -> dict[str, float]:
+        """Load available held-out test metrics for display in the web interface."""
         figure_metrics_path = (
             PROJECT_ROOT
             / "outputs"
@@ -330,12 +383,15 @@ class MainlinePredictor:
         }
 
     def _load_solvent_options(self) -> list[str]:
+        """Build the solvent dropdown from raw data or selected solvent features."""
         def display_label(value: Any) -> str:
+            """Normalize one solvent option for display in the dropdown."""
             label = str(value or "").strip().replace("\\", "/")
             label = re.sub(r"/+", "/", label)
             return label
 
         def unique_display_options(values: list[str]) -> list[str]:
+            """Return case-insensitive unique solvent labels sorted for display."""
             options: list[str] = []
             seen: set[str] = set()
             for value in values:
@@ -363,6 +419,9 @@ class MainlinePredictor:
         return unique_display_options(values)
 
     def predict(self, smiles: str, solvent: str) -> dict[str, Any]:
+        """
+        Validate one SMILES-solvent input, build aligned features, predict emission wavelength and apply optional NN correction.
+        """
         smiles = str(smiles or "").strip()
         solvent = parse_solvent_submission(solvent)
         normalized_solvent = normalize_solvent_label(solvent)
@@ -439,6 +498,7 @@ class MainlinePredictor:
         }
 
     def metadata(self) -> dict[str, Any]:
+        """Return model and workflow metadata used by the browser interface."""
         selection_info = self.experiment_config.get("selection_info", {})
         feature_blocks = self.artifact_metadata.get("feature_blocks", {})
         post_model_correction = self.artifact_metadata.get("post_model_correction", {})
@@ -1125,6 +1185,7 @@ NAV_ITEMS = [
 
 
 def render_nav(active: str) -> str:
+    """Render the web app navigation bar."""
     items = []
     for key, label, href in NAV_ITEMS:
         class_name = ' class="active"' if key == active else ""
@@ -1133,6 +1194,7 @@ def render_nav(active: str) -> str:
 
 
 def metric_strip() -> str:
+    """Render the model metric summary strip."""
     return """
     <div class="metrics" aria-label="Model performance">
       <div class="metric">
@@ -1152,6 +1214,7 @@ def metric_strip() -> str:
 
 
 def render_layout(active: str, title: str, subtitle: str, content: str) -> str:
+    """Wrap page-specific HTML in the shared app layout."""
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -1195,6 +1258,7 @@ def render_layout(active: str, title: str, subtitle: str, content: str) -> str:
 
 
 def render_home_page() -> str:
+    """Render the home page."""
     content = f"""
     <section class="two-col home-hero">
       <div class="surface">
@@ -1246,6 +1310,7 @@ def render_home_page() -> str:
 
 
 def render_prediction_page() -> str:
+    """Render the SMILES/solvent prediction page."""
     content = """
     <section class="two-col">
       <section class="surface">
@@ -1348,6 +1413,7 @@ SOLVENT_ABBREVIATIONS = [
 
 
 def render_solvent_table() -> str:
+    """Render solvent abbreviation reference table."""
     rows = "\n".join(
         f"<tr><td>{abbr}</td><td>{full_name}</td></tr>"
         for abbr, full_name in SOLVENT_ABBREVIATIONS
@@ -1363,6 +1429,7 @@ def render_solvent_table() -> str:
 
 
 def render_explanation_page() -> str:
+    """Render the workflow explanation page."""
     content = f"""
     <section class="explanation-guide">
       <div class="surface">
@@ -1474,12 +1541,15 @@ PAGE_RENDERERS = {
 
 
 class AppHandler(BaseHTTPRequestHandler):
+    """HTTP request handler for static pages, assets, metadata and prediction API calls."""
     server_version = "MainlineEmissionApp/1.0"
 
     def log_message(self, format: str, *args: Any) -> None:
+        """Send server logs to stderr."""
         sys.stderr.write("[%s] %s\n" % (self.log_date_time_string(), format % args))
 
     def _send_json(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
+        """Write a JSON HTTP response."""
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -1488,6 +1558,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _send_html(self, html: str) -> None:
+        """Write an HTML HTTP response."""
         data = html.encode("utf-8")
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -1496,6 +1567,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _send_asset(self, relative_path: str) -> None:
+        """Serve a static image asset from web_app/assets."""
         asset_name = Path(relative_path).name
         asset_path = ASSET_DIR / asset_name
         if not asset_path.exists() or not asset_path.is_file():
@@ -1511,6 +1583,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self) -> None:
+        """Route page, asset, health and metadata GET requests."""
         parsed = urlparse(self.path)
         if parsed.path.startswith("/assets/"):
             self._send_asset(parsed.path.removeprefix("/assets/"))
@@ -1536,6 +1609,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self._send_json({"error": "Not found."}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
+        """Route prediction POST requests and return JSON responses."""
         parsed = urlparse(self.path)
         if parsed.path != "/api/predict":
             self._send_json({"error": "Not found."}, HTTPStatus.NOT_FOUND)
@@ -1554,6 +1628,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
 
 def require_predictor() -> MainlinePredictor:
+    """Lazily create and cache the MainlinePredictor instance."""
     global PREDICTOR
     if PREDICTOR is None:
         PREDICTOR = MainlinePredictor()
@@ -1561,6 +1636,7 @@ def require_predictor() -> MainlinePredictor:
 
 
 def run_server(host: str, port: int) -> None:
+    """Start the threaded local HTTP server."""
     predictor = require_predictor()
     server = ThreadingHTTPServer((host, port), AppHandler)
     print(f"BTD-EmisPred web app is running at http://{host}:{port}")
@@ -1575,12 +1651,14 @@ def run_server(host: str, port: int) -> None:
 
 
 def run_self_test(smiles: str, solvent: str) -> int:
+    """Run one command-line prediction without starting the HTTP server."""
     result = require_predictor().predict(smiles, solvent)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
 
 def main() -> int:
+    """Parse web app CLI arguments and run either self-test or server mode."""
     parser = argparse.ArgumentParser(description="BTD-EmisPred emission wavelength prediction web app.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=7860)

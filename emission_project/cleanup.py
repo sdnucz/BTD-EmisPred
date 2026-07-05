@@ -1,3 +1,9 @@
+"""
+Optional output cleanup helpers.
+
+These functions remove large intermediate matrices and generated image files when
+only compact result tables and trained artifacts are needed after a run.
+"""
 from __future__ import annotations
 
 import json
@@ -30,6 +36,7 @@ TRAIN_INTERMEDIATE_FILENAMES = {
 
 
 def cleanup_intermediate_outputs(output_dir: Path, stage: str) -> list[Path]:
+    """Remove optional intermediate CSV and image files after a workflow stage."""
     if stage not in {"final", "all", "predict"}:
         return []
 
@@ -52,6 +59,7 @@ def prune_batch_run_outputs(
     keep_top_n: int = 5,
     cleanup_intermediate_files: bool = True,
 ) -> dict[str, object]:
+    """Delete bulky files from many output directories while keeping compact summary artifacts."""
     summary_path = batch_dir / "final_run_summary.csv"
     if not summary_path.exists():
         raise FileNotFoundError(f"Batch summary not found: {summary_path}")
