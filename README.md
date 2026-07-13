@@ -1,6 +1,6 @@
-# NIR-II-EmisPred
+# BTD-EmisPred
 
-NIR-II-EmisPred provides a reusable machine-learning workflow and lightweight web
+BTD-EmisPred provides a reusable machine-learning workflow and lightweight web
 application for near-infrared-II fluorescence emission wavelength prediction from
 molecular structure and solvent information.
 
