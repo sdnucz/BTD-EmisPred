@@ -139,37 +139,6 @@ The generated trained model is data-derived and is not tracked by Git:
 outputs/mainline_retrain/XGB_Final_Model.json
 ```
 
-## Evaluation
-
-Evaluation is based on training-set cross-validation for model comparison and a
-held-out test subset for final performance reporting.
-
-The current reported held-out test snapshot is:
-
-| Dataset | n | R2 | RMSE (nm) | MAE (nm) |
-| --- | ---: | ---: | ---: | ---: |
-| Held-out test | 199 | 0.9632 | 40.8 | 30.0 |
-
-Users should regenerate evaluation metrics when retraining on a modified
-dataset, a different split, or different feature settings.
-
-## Optional OOF Residual Correction
-
-The web app can optionally apply a gated nearest-neighbor residual correction if
-the training output directory contains:
-
-```text
-NN_Residual_Correction_Config.json
-NN_Residual_Correction_Library.csv
-```
-
-The residual library should be built from out-of-fold (OOF) predictions on the
-training subset. In this setup, each residual is computed from a model that did
-not train on the corresponding sample, reducing direct in-sample leakage in the
-correction library.
-
-If these files are absent, prediction falls back to the base XGBoost model.
-
 ## Usage
 
 Install dependencies, update paths in `config.train.mainline.yaml`, and run:
@@ -201,20 +170,6 @@ The repository is Python-based and CPU-oriented by default. Recommended setup:
 
 The number of CPU threads used by one Python process is controlled by
 `pipeline.max_cpu_threads`.
-
-## Known Limitations
-
-- The model is empirical and depends on the chemical and solvent coverage of
-  the training data.
-- Molecules with rare scaffolds, uncommon heteroatom patterns, unusual
-  substituents, or solvents poorly represented in the dataset may have larger
-  prediction errors.
-- Solvent effects are represented by one-hot labels rather than continuous
-  physical solvent descriptors.
-- The public repository does not include trained model artifacts; users must
-  regenerate them from the included or their own dataset.
-- Reported metrics are not universal constants; they should be recalculated
-  after any dataset, feature-selection, hyperparameter or split change.
 
 ## Data Leakage And Reproducibility Notes
 
