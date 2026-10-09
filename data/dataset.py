@@ -1,168 +1,25 @@
-"""
-Dataset preparation for BTD-EmisPred.
-
-This module cleans the molecule-solvent table, constructs Morgan fingerprint,
-RDKit fragment-count and solvent one-hot features, performs the train/test split,
-and applies feature selection using only the training partition. The selected
-feature names produced here are later saved with the model and reused for
-prediction-time feature alignment.
-"""
+"""Fold-local data preparation for molecule-grouped nested validation."""
 from __future__ import annotations
-
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
-
-import numpy as np
-import pandas as pd
+from pathlib import Path
+import numpy as np,pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import RFE
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold,StratifiedKFold,train_test_split
 from sklearn.preprocessing import StandardScaler
-
-from emission_project.utils import (
-    build_solvent_feature_frame,
-    canonicalize_smiles,
-    feature_columns,
-    get_feature_column_names,
-    normalize_solvent_label,
-    plot_feature_similarity_heatmap,
-    robust_read_csv,
-    save_dataframe,
-    smiles_to_feature_vector,
-    smiles_to_morgan,
-    smiles_to_mol,
-    target_columns,
-)
-
-
-@dataclass(frozen=True)
-class PathConfig:
-    """
-    Stores repository-relative paths for raw data, prediction inputs, trained models, selected features and metadata.
-    """
-    base_dir: Path
-    output_dir: Path
-    raw_data_file: str = "data/data/data.csv"
-    prediction_file: str = "data/prediction/SMILES-L.csv"
-    trained_model_file: str = "outputs/default_run/XGB_Final_Model.json"
-    selected_features_file: str = "outputs/default_run/Final_Model_Selected_Features.csv"
-    artifact_metadata_file: str = "outputs/default_run/Model_Artifacts_Metadata.json"
-
-    def _resolve_input_file(self, file_name: str, candidate_dirs: list[str]) -> Path:
-        """
-        Resolve an input file path, allowing either an explicit path or a basename under common data directories.
-        """
-        configured_path = Path(file_name)
-        if configured_path.is_absolute():
-            candidates = [configured_path]
-        else:
-            candidates = [self.base_dir / configured_path]
-            if len(configured_path.parts) == 1:
-                candidates.extend(self.base_dir / candidate_dir / configured_path for candidate_dir in candidate_dirs)
-        for candidate in candidates:
-            if candidate.exists():
-                return candidate
-        return candidates[0]
-
-    def _resolve_configured_path(self, file_name: str) -> Path:
-        """
-        Resolve a configured output path relative to the project base directory when it is not absolute.
-        """
-        configured_path = Path(file_name)
-        if configured_path.is_absolute():
-            return configured_path
-        return self.base_dir / configured_path
-
-    @property
-    def raw_data(self) -> Path:
-        """Return the resolved training dataset path."""
-        return self._resolve_input_file(self.raw_data_file, ["data", "data/data"])
-
-    @property
-    def prediction_data(self) -> Path:
-        """Return the resolved batch-prediction input path."""
-        return self._resolve_input_file(self.prediction_file, ["data", "data/prediction"])
-
-    @property
-    def trained_model(self) -> Path:
-        """Return the resolved trained-model artifact path."""
-        return self._resolve_configured_path(self.trained_model_file)
-
-    @property
-    def selected_features_data(self) -> Path:
-        """Return the resolved selected-feature table path."""
-        return self._resolve_configured_path(self.selected_features_file)
-
-    @property
-    def artifact_metadata(self) -> Path:
-        """Return the resolved model metadata path."""
-        return self._resolve_configured_path(self.artifact_metadata_file)
-
-
+from emission_project.utils import (canonicalize_smiles,normalize_solvent_label,robust_read_csv,
+    smiles_to_mol,smiles_to_feature_vector,get_feature_column_names,build_solvent_feature_frame,
+    feature_columns,target_columns)
+TARGET='λem (nm)'
 @dataclass(frozen=True)
 class PipelineConfig:
-    """
-    Holds all modeling options, including column names, feature blocks, split settings, feature-selection controls and final model settings.
-    """
-    target_col: str = "λem (nm)"
+    target_col: str = TARGET
+    smiles_col: str = 'SMILES'
+    solvent_col: str = 'Solvent'
     absorb_col: str | None = None
-    smiles_col: str = "SMILES"
-    morgan_radius: int = 2
-    morgan_bits: int = 2048
-    use_morgan_features: bool = True
-    use_maccs_keys: bool = False
-    use_rdkit_descriptors: bool = True
-    use_fragment_features: bool = True
-    use_solvent_features: bool = False
-    solvent_col: str | None = None
-    test_size: float = 0.2
-    stratify_bins: int = 5
-    similarity_threshold: float = 0.5
-    n_selected_features: int = 60
-    random_state: int = 42
-    outer_folds: int = 10
-    inner_folds: int = 3
-    apply_vif_filter: bool = False
-    vif_threshold: float = 10.0
-    min_features_after_vif: int = 20
-    shap_sample_limit: int = 100
-    prediction_shap_limit: int = 50
-    sample_plot_feature_limit: int = 15
-    max_cpu_threads: int = 8
+    use_solvent_features: bool = True
     deduplicate_smiles: bool = True
-    fixed_feature_list_file: str | None = None
-    final_model_type: str = "xgb"
-    final_ensemble_algorithms: list[str] | None = None
-    final_ensemble_mode: str = "mean"
-    tune_final_xgb: bool = False
-    final_xgb_params: dict[str, Any] | None = None
-    final_xgb_tuning_iterations: int = 24
-    final_xgb_tuning_cv_folds: int = 5
-    auto_cleanup_intermediate_outputs: bool = True
-
-
-@dataclass
-class PreparedData:
-    """
-    Container returned by prepare_datasets with raw data, metadata, feature matrices, selected features and train/test partitions.
-    """
-    raw_df: pd.DataFrame
-    metadata_df: pd.DataFrame
-    all_df: pd.DataFrame
-    train_df: pd.DataFrame
-    test_df: pd.DataFrame
-    train_metadata_df: pd.DataFrame
-    test_metadata_df: pd.DataFrame
-    train_f_df: pd.DataFrame
-    train_fx_df: pd.DataFrame
-    train_fxx_df: pd.DataFrame
-    train_model_df: pd.DataFrame
-    rfe_selected_features: list[str]
-    selected_features: list[str]
-    vif_removed_features: list[str]
-
 
 def get_optional_absorb_col(config: PipelineConfig) -> str | None:
     """Return the absorbance column name only when it is configured and non-empty."""
@@ -170,7 +27,6 @@ def get_optional_absorb_col(config: PipelineConfig) -> str | None:
         return None
     absorb_col = str(config.absorb_col).strip()
     return absorb_col or None
-
 
 def get_optional_solvent_col(config: PipelineConfig) -> str | None:
     """Return the solvent column name only when solvent one-hot features are enabled."""
@@ -180,32 +36,6 @@ def get_optional_solvent_col(config: PipelineConfig) -> str | None:
         return None
     solvent_col = str(config.solvent_col).strip()
     return solvent_col or None
-
-
-def get_model_value_columns(config: PipelineConfig) -> list[str]:
-    """
-    Return the non-feature value columns that must stay with the model matrix, including the target and optional solvent/absorbance fields.
-    """
-    columns: list[str] = []
-    absorb_col = get_optional_absorb_col(config)
-    if absorb_col is not None:
-        columns.append(absorb_col)
-    columns.append(config.target_col)
-    return columns
-
-
-def get_metadata_columns(config: PipelineConfig) -> list[str]:
-    """Return source columns kept for sample tracking and error analysis."""
-    columns = [config.smiles_col]
-    absorb_col = get_optional_absorb_col(config)
-    if absorb_col is not None:
-        columns.append(absorb_col)
-    solvent_col = get_optional_solvent_col(config)
-    if solvent_col is not None:
-        columns.append(solvent_col)
-    columns.append(config.target_col)
-    return columns
-
 
 def validate_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> None:
     """
@@ -231,7 +61,6 @@ def validate_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> None:
     if missing:
         missing_str = ", ".join(sorted(missing))
         raise ValueError(f"Raw dataset is missing required columns: {missing_str}")
-
 
 def clean_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
     """
@@ -268,14 +97,12 @@ def clean_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
         raise ValueError("Raw dataset has no valid rows after filtering missing or non-numeric target values.")
     return cleaned_df
 
-
 def first_non_null_value(series: pd.Series) -> Any:
     """Return the first non-null value in a grouped metadata series."""
     non_null = series.dropna()
     if non_null.empty:
         return series.iloc[0] if not series.empty else None
     return non_null.iloc[0]
-
 
 def deduplicate_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
     """
@@ -317,97 +144,6 @@ def deduplicate_raw_dataset(df: pd.DataFrame, config: PipelineConfig) -> pd.Data
     aggregated_df = dedup_df.groupby("_dedup_key", sort=False, as_index=False).agg(aggregation_map)
     return aggregated_df.drop(columns=["_dedup_key"]).reset_index(drop=True)
 
-
-def build_feature_tables(
-    raw_df: pd.DataFrame,
-    config: PipelineConfig,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Construct full model and helper feature tables from cleaned molecules.
-
-    Args:
-        raw_df: Cleaned dataframe containing SMILES, target and optional solvent.
-        config: Feature-generation configuration.
-
-    Returns:
-        model_df with features plus model value columns, and helper_df with features
-        plus metadata columns for later plots and error analysis.
-    """
-    feature_rows = [
-        smiles_to_feature_vector(
-            smiles,
-            config.morgan_radius,
-            config.morgan_bits,
-            config.use_morgan_features,
-            config.use_maccs_keys,
-            config.use_rdkit_descriptors,
-            config.use_fragment_features,
-        )[0]
-        for smiles in raw_df[config.smiles_col]
-    ]
-    feature_df = pd.DataFrame(
-        np.vstack(feature_rows),
-        columns=get_feature_column_names(
-            config.morgan_bits,
-            config.use_morgan_features,
-            config.use_maccs_keys,
-            config.use_rdkit_descriptors,
-            config.use_fragment_features,
-        ),
-    )
-    solvent_col = get_optional_solvent_col(config)
-    if solvent_col is not None:
-        solvent_feature_df = build_solvent_feature_frame(raw_df[solvent_col])
-        feature_df = pd.concat([feature_df, solvent_feature_df], axis=1)
-    model_value_columns = get_model_value_columns(config)
-    metadata_columns = get_metadata_columns(config)
-    model_df = pd.concat(
-        [feature_df, raw_df[model_value_columns].reset_index(drop=True)],
-        axis=1,
-    )
-    helper_df = pd.concat(
-        [
-            feature_df,
-            raw_df[metadata_columns].reset_index(drop=True),
-        ],
-        axis=1,
-    )
-    return model_df, helper_df
-
-
-def stratified_split(
-    df: pd.DataFrame,
-    config: PipelineConfig,
-) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray]:
-    """
-    Split the full feature table into train and held-out test partitions.
-
-    The split is stratified by emission-wavelength quantile bins when enough label
-    variety exists; otherwise it falls back to a shuffled random split.
-    """
-    indices = np.arange(len(df))
-    stratify_bins = min(config.stratify_bins, df[config.target_col].nunique())
-    if stratify_bins < 2:
-        train_indices, test_indices = train_test_split(
-            indices,
-            test_size=config.test_size,
-            shuffle=True,
-            random_state=config.random_state,
-        )
-    else:
-        stratify_labels = pd.qcut(df[config.target_col], q=stratify_bins, duplicates="drop")
-        train_indices, test_indices = train_test_split(
-            indices,
-            test_size=config.test_size,
-            shuffle=True,
-            random_state=config.random_state,
-            stratify=stratify_labels,
-        )
-    train_df = df.iloc[train_indices].reset_index(drop=True)
-    test_df = df.iloc[test_indices].reset_index(drop=True)
-    return train_df, test_df, np.asarray(train_indices), np.asarray(test_indices)
-
-
 def variance_filter(train_df: pd.DataFrame) -> tuple[pd.DataFrame, list[str], list[str]]:
     """Remove zero-variance features using only the training partition."""
     features = feature_columns(train_df)
@@ -417,7 +153,6 @@ def variance_filter(train_df: pd.DataFrame) -> tuple[pd.DataFrame, list[str], li
     dropped_features = [feature for feature in features if feature not in kept_features]
     reduced_df = pd.concat([train_df[kept_features], train_df[targets]], axis=1)
     return reduced_df, kept_features, dropped_features
-
 
 def correlation_filter(
     train_df: pd.DataFrame,
@@ -451,370 +186,119 @@ def correlation_filter(
     reduced_df = pd.concat([train_df[selected_features], train_df[targets]], axis=1)
     return reduced_df, selected_features, dropped_features
 
+def group_table(y, groups):
+    return pd.DataFrame({'group': groups, 'y': y}).groupby('group', sort=False).y.mean().reset_index()
 
-def rfe_select_features(
-    train_df: pd.DataFrame,
-    target_col: str,
-    n_selected_features: int,
-    random_state: int,
-    max_cpu_threads: int,
-) -> tuple[pd.DataFrame, list[str], list[str]]:
-    """
-    Select a fixed number of features by recursive feature elimination on training data.
-
-    A RandomForestRegressor ranks candidate features after scaling. The validation and
-    test partitions are never used to decide which features survive this step.
-    """
-    features = feature_columns(train_df)
-    targets = target_columns(train_df)
-    n_selected = min(n_selected_features, len(features))
-
-    scaler = StandardScaler()
-    x_scaled = scaler.fit_transform(train_df[features].values)
-    y = train_df[target_col].values
-
-    estimator = RandomForestRegressor(
-        n_estimators=150,
-        max_depth=10,
-        random_state=random_state,
-        n_jobs=max_cpu_threads,
-    )
-    selector = RFE(
-        estimator=estimator,
-        n_features_to_select=n_selected,
-        step=2,
-        verbose=0,
-    )
-    selector.fit(x_scaled, y)
-
-    selected_features = [features[index] for index, keep in enumerate(selector.support_) if keep]
-    dropped_features = [features[index] for index, keep in enumerate(selector.support_) if not keep]
-    reduced_df = pd.concat([train_df[selected_features], train_df[targets]], axis=1)
-    return reduced_df, selected_features, dropped_features
-
-
-def build_sample_metadata(raw_df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
-    """Build a row-level metadata table with stable sample IDs for later exports."""
-    metadata_df = raw_df[get_metadata_columns(config)].copy().reset_index(drop=True)
-    metadata_df.insert(0, "Sample_ID", np.arange(1, len(metadata_df) + 1))
-    return metadata_df
-
-
-def resolve_fixed_feature_list_path(paths: PathConfig, config: PipelineConfig) -> Path | None:
-    """Resolve an optional pre-defined feature list path from the config."""
-    if config.fixed_feature_list_file is None:
+def stratification(y, bins, minimum):
+    count = min(bins, len(np.unique(y)))
+    if count < 2:
         return None
-    configured_path = Path(str(config.fixed_feature_list_file))
-    if configured_path.is_absolute():
-        return configured_path
-    return paths.base_dir / configured_path
+    labels = pd.qcut(pd.Series(y), q=count, duplicates='drop')
+    if labels.nunique() < 2 or labels.value_counts().min() < minimum:
+        return None
+    # Preserve the historical implementation's class ordering as well as its seed.
+    return labels.astype(str)
 
+def group_holdout(y, groups, seed, test_size, bins):
+    table = group_table(y, groups)
+    fit, test = train_test_split(np.arange(len(table)), random_state=seed, test_size=test_size,
+                                stratify=stratification(table.y, bins, 2))
+    return tuple(np.flatnonzero(np.isin(groups, table.group.iloc[index])) for index in (fit, test))
 
-def load_fixed_feature_list(feature_list_path: Path, available_features: list[str]) -> list[str]:
-    """
-    Load and validate a fixed selected-feature list against features available in the current run.
-    """
-    if not feature_list_path.exists():
-        raise FileNotFoundError(f"Fixed feature list file not found: {feature_list_path}")
-
-    feature_df = robust_read_csv(feature_list_path)
-    if feature_df.empty:
-        raise ValueError(f"Fixed feature list file is empty: {feature_list_path}")
-
-    column_name = "Selected_Features" if "Selected_Features" in feature_df.columns else feature_df.columns[0]
-    selected_features = feature_df[column_name].dropna().astype(str).tolist()
-    if not selected_features:
-        raise ValueError(f"Fixed feature list file contains no usable features: {feature_list_path}")
-
-    selected_features = list(dict.fromkeys(selected_features))
-    available_feature_set = set(available_features)
-    missing_features = [feature_name for feature_name in selected_features if feature_name not in available_feature_set]
-    if missing_features:
-        preview = ", ".join(missing_features[:5])
-        raise ValueError(
-            "Fixed feature list contains features unavailable after the current variance/correlation filters. "
-            f"Missing {len(missing_features)} features. Examples: {preview}"
-        )
-    return selected_features
-
-
-def build_feature_selection_summary(
-    all_df: pd.DataFrame,
-    train_df: pd.DataFrame,
-    test_df: pd.DataFrame,
-    train_f_df: pd.DataFrame,
-    train_fx_df: pd.DataFrame,
-    train_fxx_df: pd.DataFrame,
-    final_feature_count: int | None = None,
-) -> pd.DataFrame:
-    """
-    Summarize the number of samples and features retained after each feature-selection stage.
-    """
-    initial_feature_count = len(feature_columns(all_df))
-    variance_feature_count = len(feature_columns(train_f_df))
-    correlation_feature_count = len(feature_columns(train_fx_df))
-    rfe_feature_count = len(feature_columns(train_fxx_df))
-    model_feature_count = rfe_feature_count if final_feature_count is None else final_feature_count
-
-    metrics = [
-        "Total_Samples",
-        "Train_Samples",
-        "Test_Samples",
-        "Initial_Features",
-        "After_Variance_Filter",
-        "Removed_By_Variance_Filter",
-        "After_Correlation_Filter",
-        "Removed_By_Correlation_Filter",
-        "After_RFE",
-        "Removed_By_RFE",
-    ]
-    values = [
-        len(all_df),
-        len(train_df),
-        len(test_df),
-        initial_feature_count,
-        variance_feature_count,
-        initial_feature_count - variance_feature_count,
-        correlation_feature_count,
-        variance_feature_count - correlation_feature_count,
-        rfe_feature_count,
-        correlation_feature_count - rfe_feature_count,
-    ]
-
-    if model_feature_count != rfe_feature_count:
-        metrics.extend([
-            "After_VIF_Filter",
-            "Removed_By_VIF_Filter",
-        ])
-        values.extend([
-            model_feature_count,
-            rfe_feature_count - model_feature_count,
-        ])
-
-    return pd.DataFrame({"Metric": metrics, "Value": values})
-
-
-def compute_vif_summary(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute variance inflation factor diagnostics for selected features."""
-    features = feature_columns(df)
-    if not features:
-        return pd.DataFrame(columns=["Feature", "VIF", "Tolerance", "Max_Abs_PairCorr", "VIF_Level"])
-
-    x = df[features].astype(float).values
-    x_scaled = StandardScaler().fit_transform(x)
-
-    if len(features) == 1:
-        return pd.DataFrame(
-            {
-                "Feature": features,
-                "VIF": [1.0],
-                "Tolerance": [1.0],
-                "Max_Abs_PairCorr": [0.0],
-                "VIF_Level": ["Low"],
-            }
-        )
-
-    corr_matrix = np.abs(np.corrcoef(x_scaled, rowvar=False))
-    np.fill_diagonal(corr_matrix, 0.0)
-    max_pair_corr = corr_matrix.max(axis=1)
-
-    vif_rows: list[dict[str, Any]] = []
-    for feature_index, feature_name in enumerate(features):
-        y_feature = x_scaled[:, feature_index]
-        x_other = np.delete(x_scaled, feature_index, axis=1)
-        model = LinearRegression()
-        model.fit(x_other, y_feature)
-        r2_value = float(model.score(x_other, y_feature))
-
-        if r2_value >= 0.999999:
-            vif_value = float("inf")
-            tolerance = 0.0
-        else:
-            tolerance = max(1.0 - r2_value, 0.0)
-            vif_value = 1.0 / tolerance if tolerance > 0 else float("inf")
-
-        if vif_value >= 10:
-            vif_level = "High"
-        elif vif_value >= 5:
-            vif_level = "Moderate"
-        else:
-            vif_level = "Low"
-
-        vif_rows.append(
-            {
-                "Feature": feature_name,
-                "VIF": vif_value,
-                "Tolerance": tolerance,
-                "Max_Abs_PairCorr": float(max_pair_corr[feature_index]),
-                "VIF_Level": vif_level,
-            }
-        )
-
-    return pd.DataFrame(vif_rows).sort_values(
-        ["VIF", "Max_Abs_PairCorr"],
-        ascending=[False, False],
-        na_position="last",
-    ).reset_index(drop=True)
-
-
-def vif_filter_features(
-    train_df: pd.DataFrame,
-    vif_threshold: float,
-    min_features_after_vif: int,
-) -> tuple[pd.DataFrame, list[str], list[str], pd.DataFrame, pd.DataFrame]:
-    """Iteratively remove high-VIF features while preserving a minimum feature count."""
-    features = feature_columns(train_df)
-    targets = target_columns(train_df)
-    current_features = features.copy()
-    removed_features: list[str] = []
-    refinement_rows: list[dict[str, Any]] = []
-
-    while len(current_features) > max(1, min_features_after_vif):
-        current_df = pd.concat([train_df[current_features], train_df[targets]], axis=1)
-        vif_summary = compute_vif_summary(current_df)
-        if vif_summary.empty:
-            break
-
-        top_row = vif_summary.iloc[0]
-        top_vif = float(top_row["VIF"])
-        if np.isfinite(top_vif) and top_vif <= vif_threshold:
-            break
-
-        feature_to_remove = str(top_row["Feature"])
-        refinement_rows.append(
-            {
-                "Step": len(refinement_rows) + 1,
-                "Removed_Feature": feature_to_remove,
-                "Removed_Feature_VIF": top_vif,
-                "Removed_Feature_Max_Abs_PairCorr": float(top_row["Max_Abs_PairCorr"]),
-                "Remaining_Features_After_Removal": len(current_features) - 1,
-            }
-        )
-        current_features.remove(feature_to_remove)
-        removed_features.append(feature_to_remove)
-
-    reduced_df = pd.concat([train_df[current_features], train_df[targets]], axis=1)
-    final_vif_summary = compute_vif_summary(reduced_df)
-    refinement_log = pd.DataFrame(refinement_rows)
-    return reduced_df, current_features, removed_features, refinement_log, final_vif_summary
-
-
-def prepare_datasets(paths: PathConfig, config: PipelineConfig) -> PreparedData:
-    """
-    Run the full data-preparation and feature-selection workflow.
-
-    Args:
-        paths: Resolved input/output paths.
-        config: Pipeline configuration.
-
-    Returns:
-        PreparedData containing cleaned data, metadata, train/test splits, selected
-        features and VIF diagnostics.
-
-    Key ML flow:
-        The test set is split before feature selection. Variance filtering,
-        correlation filtering, RFE and optional VIF filtering are all fitted only on
-        the training partition, then the final selected feature names are applied to
-        both train and test matrices. This prevents direct leakage from the held-out
-        test labels into feature selection.
-    """
-    raw_df = robust_read_csv(paths.raw_data)
-    validate_raw_dataset(raw_df, config)
-    raw_df = clean_raw_dataset(raw_df, config)
-    raw_df = deduplicate_raw_dataset(raw_df, config)
-    metadata_df = build_sample_metadata(raw_df, config)
-
-    all_df, helper_df = build_feature_tables(raw_df, config)
-    train_df, test_df, train_indices, test_indices = stratified_split(all_df, config)
-    train_metadata_df = metadata_df.iloc[train_indices].reset_index(drop=True)
-    test_metadata_df = metadata_df.iloc[test_indices].reset_index(drop=True)
-    # Feature selection is intentionally fitted on train_df only. The held-out
-    # test_df is reduced later by column name so test labels never influence the
-    # variance, correlation, RFE or VIF decisions.
-    train_f_df, _, _ = variance_filter(train_df)
-    train_fx_df, _, _ = correlation_filter(train_f_df, config.similarity_threshold)
-    fixed_feature_list_path = resolve_fixed_feature_list_path(paths, config)
-    if fixed_feature_list_path is None:
-        train_fxx_df, rfe_selected_features, _ = rfe_select_features(
-            train_fx_df,
-            config.target_col,
-            config.n_selected_features,
-            config.random_state,
-            config.max_cpu_threads,
-        )
+def group_folds(y, groups, seed, folds, bins):
+    table = group_table(y, groups)
+    labels = stratification(table.y, bins, folds)
+    if labels is None:
+        indices = KFold(folds, shuffle=True, random_state=seed).split(table)
     else:
-        rfe_selected_features = load_fixed_feature_list(fixed_feature_list_path, feature_columns(train_df))
-        train_fxx_df = pd.concat([train_df[rfe_selected_features], train_df[target_columns(train_df)]], axis=1)
-    initial_vif_summary = compute_vif_summary(train_fxx_df)
+        indices = StratifiedKFold(folds, shuffle=True, random_state=seed).split(table, labels)
+    return [(np.flatnonzero(np.isin(groups, table.group.iloc[a])),
+             np.flatnonzero(np.isin(groups, table.group.iloc[b]))) for a, b in indices]
 
-    if config.apply_vif_filter:
-        train_model_df, selected_features, vif_removed_features, vif_refinement_log, final_vif_summary = vif_filter_features(
-            train_fxx_df,
-            config.vif_threshold,
-            config.min_features_after_vif,
-        )
-    else:
-        train_model_df = train_fxx_df.copy()
-        selected_features = rfe_selected_features.copy()
-        vif_removed_features = []
-        vif_refinement_log = pd.DataFrame(
-            columns=[
-                "Step",
-                "Removed_Feature",
-                "Removed_Feature_VIF",
-                "Removed_Feature_Max_Abs_PairCorr",
-                "Remaining_Features_After_Removal",
-            ]
-        )
-        final_vif_summary = initial_vif_summary.copy()
+def featurize(frame, solvent_categories, *, radius, bits):
+    if frame.empty or not {'SMILES', 'Solvent'}.issubset(frame):
+        raise ValueError('A nonempty SMILES/Solvent table is required.')
+    invalid = frame.SMILES.map(lambda s: smiles_to_mol(s) is None)
+    solvents = frame.Solvent.map(normalize_solvent_label)
+    if invalid.any() or solvents.eq('').any():
+        raise ValueError('Invalid SMILES or missing solvent; prediction was not performed.')
+    rows = [smiles_to_feature_vector(s, radius, bits, True, False, False, True)[0] for s in frame.SMILES]
+    x = pd.DataFrame(np.vstack(rows), columns=get_feature_column_names(bits, True, False, False, True))
+    return pd.concat([x, build_solvent_feature_frame(solvents.reset_index(drop=True), solvent_categories)], axis=1)
 
-    split_assignment_df = metadata_df.copy()
-    split_assignment_df["Split"] = "Train"
-    split_assignment_df.loc[test_indices, "Split"] = "Test"
-    feature_selection_summary = build_feature_selection_summary(
-        all_df,
-        train_df,
-        test_df,
-        train_f_df,
-        train_fx_df,
-        train_fxx_df,
-        final_feature_count=len(selected_features),
-    )
+def check_partition(raw, fit, valid):
+    fit, valid = np.asarray(fit, dtype=int), np.asarray(valid, dtype=int)
+    if (not len(fit) or not len(valid) or len(np.unique(fit)) != len(fit)
+            or len(np.unique(valid)) != len(valid) or min(fit.min(), valid.min()) < 0
+            or max(fit.max(), valid.max()) >= len(raw) or np.intersect1d(fit, valid).size):
+        raise ValueError('Invalid or overlapping record partitions.')
+    if set(raw.iloc[fit].canonical_smiles) & set(raw.iloc[valid].canonical_smiles):
+        raise ValueError('Molecules cross the training/validation boundary.')
 
-    save_dataframe(all_df, paths.output_dir / "Feature_all.csv")
-    save_dataframe(helper_df, paths.output_dir / "Feature_all_with_smiles.csv")
-    save_dataframe(train_df, paths.output_dir / "Feature_train.csv")
-    save_dataframe(test_df, paths.output_dir / "Feature_test.csv")
-    save_dataframe(train_f_df, paths.output_dir / "Feature_train_F.csv")
-    save_dataframe(train_fx_df, paths.output_dir / "Feature_train_FX.csv")
-    save_dataframe(train_fxx_df, paths.output_dir / "Feature_train_FXX.csv")
-    save_dataframe(pd.DataFrame({"Selected_Features": rfe_selected_features}), paths.output_dir / "FXX_selected_features.csv")
-    save_dataframe(pd.DataFrame({"Selected_Features": selected_features}), paths.output_dir / "Final_Model_Selected_Features.csv")
-    save_dataframe(split_assignment_df, paths.output_dir / "Dataset_Split_Assignment.csv")
-    save_dataframe(feature_selection_summary, paths.output_dir / "Feature_Selection_Summary.csv")
-    save_dataframe(initial_vif_summary, paths.output_dir / "Feature_VIF_Summary_Before_Filter.csv")
-    save_dataframe(final_vif_summary, paths.output_dir / "Feature_VIF_Summary.csv")
+def feature_matrix(structural, solvents, categories):
+    solvents = pd.Series(solvents).reset_index(drop=True).map(normalize_solvent_label)
+    if len(structural) != len(solvents) or solvents.eq('').any():
+        raise ValueError('Missing solvent or inconsistent input lengths.')
+    x = pd.concat([structural.reset_index(drop=True), build_solvent_feature_frame(solvents, categories)], axis=1)
+    if x.columns.duplicated().any() or not np.isfinite(x.to_numpy()).all():
+        raise ValueError('Duplicate or nonfinite input features.')
+    return x, (~solvents.isin(categories)).to_numpy()
 
-    if config.apply_vif_filter:
-        save_dataframe(train_model_df, paths.output_dir / "Feature_train_FXX_VIF.csv")
-        save_dataframe(pd.DataFrame({"Removed_Feature": vif_removed_features}), paths.output_dir / "VIF_Removed_Features.csv")
-        save_dataframe(vif_refinement_log, paths.output_dir / "Feature_VIF_Refinement_Log.csv")
+def fit_selector(structural, training, config):
+    categories = sorted(training.Solvent.map(normalize_solvent_label).unique().tolist())
+    x, _ = feature_matrix(structural, training.Solvent, categories)
+    y = training[TARGET].to_numpy(dtype=float)
+    if not np.isfinite(y).all():
+        raise ValueError('Nonfinite training labels.')
+    frame = x.copy()
+    frame[TARGET] = y
+    variance, variance_columns, _ = variance_filter(frame)
+    correlated, candidate_columns, _ = correlation_filter(variance, config['correlation_threshold'])
+    candidates = correlated[candidate_columns]
+    if candidates.shape[1] < config['selected_features']:
+        raise ValueError(f'Only {candidates.shape[1]} features remain; cannot select {config["selected_features"]}.')
+    scaler = StandardScaler()
+    selector = RFE(RandomForestRegressor(n_estimators=config['rfe_estimators'],
+                   max_depth=config['rfe_depth'], random_state=config['seed'], n_jobs=config['threads']),
+                   n_features_to_select=config['selected_features'], step=config['rfe_step'])
+    selector.fit(scaler.fit_transform(candidates), y)
+    selected = candidates.columns[selector.support_].tolist()
+    state = dict(fit_record_ids=training.record_id.astype(int).tolist(),
+                 solvent_categories=categories, selected_features=selected,
+                 initial_feature_count=x.shape[1], after_variance=variance_columns,
+                 after_correlation=candidate_columns, rfe_ranking=selector.ranking_.tolist(),
+                 rfe_scaler_mean=scaler.mean_.tolist(), rfe_scaler_scale=scaler.scale_.tolist(),
+                 scaling_applied_to='RF-RFE only; estimators receive raw selected features; KNN/KRR/SVR apply their own training-fold scaler',
+                 unknown_solvent_policy='all-zero encoding with explicit flag', vif_filter_applied=False)
+    return x[selected], y, state
 
-    plot_feature_similarity_heatmap(train_fxx_df, paths.output_dir / "Feature_Similarity_Heatmap_English_LargeFont.png")
+def prepare_fold(structural, raw, fit, valid, config):
+    check_partition(raw, fit, valid)
+    x_train, y_train, state = fit_selector(structural.iloc[fit], raw.iloc[fit], config)
+    x_valid, unknown = feature_matrix(structural.iloc[valid], raw.iloc[valid].Solvent, state['solvent_categories'])
+    return dict(x_train=x_train, y_train=y_train, state=state,
+                x_valid=x_valid[state['selected_features']],
+                y_valid=raw.iloc[valid][TARGET].to_numpy(dtype=float), unknown_solvent=unknown)
 
-    return PreparedData(
-        raw_df=raw_df,
-        metadata_df=metadata_df,
-        all_df=all_df,
-        train_df=train_df,
-        test_df=test_df,
-        train_metadata_df=train_metadata_df,
-        test_metadata_df=test_metadata_df,
-        train_f_df=train_f_df,
-        train_fx_df=train_fx_df,
-        train_fxx_df=train_fxx_df,
-        train_model_df=train_model_df,
-        rfe_selected_features=rfe_selected_features,
-        selected_features=selected_features,
-        vif_removed_features=vif_removed_features,
-    )
+def inner_splits(raw, parent, config):
+    parent = np.asarray(parent, dtype=int)
+    subset = raw.iloc[parent]
+    splits = [(parent[a], parent[b]) for a, b in group_folds(
+        subset[TARGET].to_numpy(), subset.canonical_smiles.to_numpy(), config['seed'],
+        config['inner_folds'], config['stratify_bins'])]
+    for fit, valid in splits:
+        check_partition(raw, fit, valid)
+    if sorted(np.concatenate([b for _, b in splits]).tolist()) != sorted(parent.tolist()):
+        raise ValueError('Inner validation coverage is incomplete or duplicated.')
+    return splits
+def load_data(path):
+    config = PipelineConfig()
+    source = robust_read_csv(Path(path))
+    validate_raw_dataset(source, config)
+    raw = deduplicate_raw_dataset(clean_raw_dataset(source, config), config).reset_index(drop=True)
+    labels = raw[TARGET].to_numpy(float)
+    if not np.isfinite(labels).all() or (labels <= 0).any():
+        raise ValueError('Emission wavelengths must be positive and finite.')
+    raw['canonical_smiles'] = raw.SMILES.map(canonicalize_smiles)
+    raw['record_id'] = np.arange(len(raw))
+    return raw
