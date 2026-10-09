@@ -1,24 +1,30 @@
 # BTD-EmisPred
 
-BTD-EmisPred provides reusable training and prediction code for emission
-wavelength prediction from molecular SMILES and solvent information.
-
-This version contains four code files, the cleaned dataset and installation
-information. Experiment settings are supplied at runtime. Dataset partitions, fitted models
-and results are generated locally rather than bundled with the code.
+BTD-EmisPred predicts the fluorescence emission wavelength of BTD-based
+molecules from molecular SMILES and solvent information. It combines molecular
+fingerprints, RDKit fragment counts and solvent features with machine-learning
+regression. Training uses molecule-grouped nested cross-validation for feature
+selection, algorithm comparison and parameter optimization.
 
 ## Files
 
-- `train.py`: molecule-grouped nested validation, candidate selection and final fitting.
-- `predict.py`: predictions using a saved model and selector.
-- `data/dataset.py`: cleaning, grouping, molecular/solvent features and fold-local selection.
-- `emission_project/utils.py`: shared molecular, solvent and metric utilities.
-- `data/data/nir2_emission_dataset.csv`: cleaned molecule-solvent records with literature provenance.
-- `requirements.txt`, `LICENSE` and `.gitignore`.
+| File | Purpose |
+| --- | --- |
+| `train.py` | Run nested cross-validation, select an algorithm and its parameters, fit the final model and evaluate test predictions. |
+| `predict.py` | Predict emission wavelengths for new molecule–solvent records using a trained model. |
+| `data/dataset.py` | Clean records, group molecules, construct features and perform feature selection within training folds. |
+| `emission_project/utils.py` | Provide shared molecular, solvent, data-reading and evaluation utilities. |
+| `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
+| `requirements.txt` | List the Python dependencies and their versions. |
+| `LICENSE` | Define the BSD 3-Clause license for the source code. |
+| `.gitignore` | Exclude generated outputs, local configuration files and temporary files from Git tracking. |
+| `README.md` | Describe the project, files and usage. |
 
-## Installation
+## Usage
 
-The code was checked with Python 3.12 and the dependency versions below.
+### 1. Install
+
+Use Python 3.12 and install the dependencies:
 
 ```bash
 conda create -n nir2-emispred python=3.12 -y
@@ -26,58 +32,45 @@ conda activate nir2-emispred
 pip install -r requirements.txt
 ```
 
-## Training
+### 2. Train
 
 Training data require `SMILES`, `Solvent` and `λem (nm)` columns.
-Create your own local JSON configuration; no experiment configuration is shipped.
 
-Required configuration keys are `test_size`, `outer_folds`, `inner_folds`,
-`stratify_bins`, `selected_features`, `correlation_threshold`,
-`rfe_estimators`, `rfe_depth`, `rfe_step`, `n_trials`,
-`morgan_radius`, `morgan_bits` and `search_spaces`.
+Create a JSON configuration named `settings.json` with these required keys:
+
+- Data splitting: `test_size`, `outer_folds`, `inner_folds`, `stratify_bins`.
+- Feature construction: `morgan_radius`, `morgan_bits`.
+- Feature selection: `selected_features`, `correlation_threshold`,
+  `rfe_estimators`, `rfe_depth`, `rfe_step`.
+- Parameter search: `n_trials`, `search_spaces`.
+
 Optional `seed`, `threads` and `outer_jobs` control reproducibility and CPU use.
-
 `search_spaces` maps candidate names (`XGB`, `CAT`, `LGBM`, `RF`, `GBR`,
-`KNN`, `KRR`, `SVR`) to estimator parameter specifications. Each parameter
-may be a fixed value, an `int` or `float` specification with `low`, `high`
-and optional `step`/`log`, or a `categorical` specification with `choices`.
-The specification type is given in `kind`.
+`KNN`, `KRR`, `SVR`) to estimator parameters. Each parameter can be a fixed
+value or a search specification: `kind` = `int` / `float` with `low`, `high`
+and optional `step` / `log`, or `kind` = `categorical` with `choices`.
 
 ```bash
 python train.py --data data/data/nir2_emission_dataset.csv \
   --config settings.json --output outputs/run
 ```
 
-Molecules are grouped before splitting. Solvent encoding, variance/correlation
-filtering and RF-RFE are fitted within each training fold. KNN, KRR and SVR also
-standardize selected inputs using training-fold statistics. Mean inner-fold RMSE
-selects the candidate and parameters; alphabetical algorithm order resolves
-exact ties. Outer OOF predictions evaluate the selection procedure. Selection is
-repeated on all training records before final test evaluation. No residual
-correction is applied.
+Training writes cross-validation predictions, evaluation metrics, search
+records and the final model to `outputs/run`. The trained model and its saved
+feature selector are stored in `outputs/run/final`. Use a new output directory
+for each training run.
 
-Outputs include partitions, selectors, search records, models, predictions,
-metrics and hashes under the requested output directory. These generated files
-are excluded from Git. Existing output directories are rejected.
+### 3. Predict
 
-## Prediction
-
-Prediction inputs require `SMILES` and `Solvent`.
+Prepare a CSV file with `SMILES` and `Solvent` columns, then run:
 
 ```bash
 python predict.py --model outputs/run/final \
   --input new_molecules.csv --output new_predictions.csv
 ```
 
-The saved selector defines the feature order and fingerprint settings.
-Outputs include `prediction_nm` and `unknown_solvent`; unseen solvents are
-encoded as all zeros and flagged. Invalid structures or missing solvents are
-rejected. For an older selector without fingerprint settings, supply your own
-local feature configuration with `--config`.
-Only load serialized model files produced by a trusted training run.
-
-## License
-
-The source code is released under the BSD 3-Clause License. The cleaned dataset
-is provided for academic reuse under CC BY 4.0, with literature DOI provenance
-retained in the `doi` column.
+The output preserves the input columns and adds `prediction_nm` (predicted
+emission wavelength in nm) and `unknown_solvent` (whether the solvent was
+absent from the model's training vocabulary). The saved selector supplies
+the feature order and fingerprint settings. Use a new output filename for
+each prediction run.
