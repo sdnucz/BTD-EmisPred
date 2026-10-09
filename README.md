@@ -16,9 +16,6 @@ selection, algorithm comparison and parameter optimization.
 | `emission_project/utils.py` | Provide shared molecular, solvent, data-reading and evaluation utilities. |
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
 | `requirements.txt` | List the Python dependencies and their versions. |
-| `LICENSE` | Define the BSD 3-Clause license for the source code. |
-| `.gitignore` | Exclude generated outputs, local configuration files and temporary files from Git tracking. |
-| `README.md` | Describe the project, files and usage. |
 
 ## Usage
 
@@ -27,8 +24,8 @@ selection, algorithm comparison and parameter optimization.
 Use Python 3.12 and install the dependencies:
 
 ```bash
-conda create -n nir2-emispred python=3.12 -y
-conda activate nir2-emispred
+conda create -n your_env python=3.12 -y
+conda activate your_env
 pip install -r requirements.txt
 ```
 
