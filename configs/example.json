@@ -1,0 +1,214 @@
+{
+  "test_size": 0.2,
+  "outer_folds": 3,
+  "inner_folds": 3,
+  "stratify_bins": 4,
+  "morgan_radius": 2,
+  "morgan_bits": 2048,
+  "selected_features": 64,
+  "correlation_threshold": 0.7,
+  "rfe_estimators": 50,
+  "rfe_depth": 8,
+  "rfe_step": 100,
+  "n_trials": 3,
+  "seed": 42,
+  "threads": 2,
+  "outer_jobs": 1,
+  "search_spaces": {
+    "XGB": {
+      "n_estimators": {
+        "kind": "int",
+        "low": 100,
+        "high": 300,
+        "step": 100
+      },
+      "max_depth": {
+        "kind": "int",
+        "low": 3,
+        "high": 6
+      },
+      "learning_rate": {
+        "kind": "float",
+        "low": 0.03,
+        "high": 0.15,
+        "log": true
+      },
+      "subsample": {
+        "kind": "float",
+        "low": 0.7,
+        "high": 1
+      },
+      "colsample_bytree": {
+        "kind": "float",
+        "low": 0.7,
+        "high": 1
+      },
+      "reg_lambda": {
+        "kind": "float",
+        "low": 0.1,
+        "high": 10,
+        "log": true
+      }
+    },
+    "CAT": {
+      "iterations": {
+        "kind": "int",
+        "low": 100,
+        "high": 300,
+        "step": 100
+      },
+      "depth": {
+        "kind": "int",
+        "low": 4,
+        "high": 6
+      },
+      "learning_rate": {
+        "kind": "float",
+        "low": 0.03,
+        "high": 0.15,
+        "log": true
+      },
+      "l2_leaf_reg": {
+        "kind": "float",
+        "low": 1,
+        "high": 10,
+        "log": true
+      }
+    },
+    "LGBM": {
+      "n_estimators": {
+        "kind": "int",
+        "low": 100,
+        "high": 300,
+        "step": 100
+      },
+      "num_leaves": {
+        "kind": "int",
+        "low": 15,
+        "high": 31
+      },
+      "learning_rate": {
+        "kind": "float",
+        "low": 0.03,
+        "high": 0.15,
+        "log": true
+      },
+      "min_child_samples": {
+        "kind": "int",
+        "low": 10,
+        "high": 30
+      }
+    },
+    "RF": {
+      "n_estimators": {
+        "kind": "int",
+        "low": 100,
+        "high": 200,
+        "step": 100
+      },
+      "max_depth": {
+        "kind": "categorical",
+        "choices": [
+          8,
+          16,
+          null
+        ]
+      },
+      "min_samples_leaf": {
+        "kind": "int",
+        "low": 1,
+        "high": 4
+      },
+      "max_features": {
+        "kind": "categorical",
+        "choices": [
+          0.5,
+          1
+        ]
+      }
+    },
+    "GBR": {
+      "n_estimators": {
+        "kind": "int",
+        "low": 100,
+        "high": 300,
+        "step": 100
+      },
+      "max_depth": {
+        "kind": "int",
+        "low": 2,
+        "high": 4
+      },
+      "learning_rate": {
+        "kind": "float",
+        "low": 0.03,
+        "high": 0.15,
+        "log": true
+      },
+      "min_samples_leaf": {
+        "kind": "int",
+        "low": 1,
+        "high": 4
+      }
+    },
+    "KNN": {
+      "n_neighbors": {
+        "kind": "int",
+        "low": 3,
+        "high": 15
+      },
+      "weights": {
+        "kind": "categorical",
+        "choices": [
+          "uniform",
+          "distance"
+        ]
+      },
+      "p": {
+        "kind": "categorical",
+        "choices": [
+          1,
+          2
+        ]
+      }
+    },
+    "KRR": {
+      "kernel": "rbf",
+      "alpha": {
+        "kind": "float",
+        "low": 0.1,
+        "high": 100,
+        "log": true
+      },
+      "gamma": {
+        "kind": "float",
+        "low": 0.001,
+        "high": 0.1,
+        "log": true
+      }
+    },
+    "SVR": {
+      "kernel": "rbf",
+      "C": {
+        "kind": "float",
+        "low": 10,
+        "high": 1000,
+        "log": true
+      },
+      "epsilon": {
+        "kind": "float",
+        "low": 0.1,
+        "high": 10,
+        "log": true
+      },
+      "gamma": {
+        "kind": "categorical",
+        "choices": [
+          "scale",
+          0.001,
+          0.01
+        ]
+      }
+    }
+  }
+}

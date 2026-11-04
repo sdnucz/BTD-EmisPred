@@ -16,6 +16,7 @@ selection, algorithm comparison and parameter optimization.
 | `emission_project/utils.py` | Provide shared molecular, solvent, data-reading and evaluation utilities. |
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
 | `requirements.txt` | List the Python dependencies and their versions. |
+| `configs/example.json` | Provide a complete example configuration for data splitting, feature selection and hyperparameter search across eight algorithms. |
 
 ## Usage
 
@@ -33,7 +34,21 @@ pip install -r requirements.txt
 
 Training data require `SMILES`, `Solvent` and `λem (nm)` columns.
 
-Create a JSON configuration named `settings.json` with these required keys:
+Run training with the supplied example configuration:
+
+```bash
+python train.py --data data/data/nir2_emission_dataset.csv \
+  --config configs/example.json --output outputs/run
+```
+
+The example uses molecule-grouped 3-fold outer and 3-fold inner cross-validation,
+64 selected features and 3 Optuna trials per algorithm in each selection round.
+It reserves 20% of molecular groups for testing, uses seed 42 and runs one outer
+fold at a time with two CPU threads. These are adjustable demonstration settings.
+Increase the fold counts and search budget as needed for your study.
+
+Edit `configs/example.json`, or copy it to a separate JSON file and pass that
+file with `--config`. The configuration contains:
 
 - Data splitting: `test_size`, `outer_folds`, `inner_folds`, `stratify_bins`.
 - Feature construction: `morgan_radius`, `morgan_bits`.
@@ -41,16 +56,11 @@ Create a JSON configuration named `settings.json` with these required keys:
   `rfe_estimators`, `rfe_depth`, `rfe_step`.
 - Parameter search: `n_trials`, `search_spaces`.
 
-Optional `seed`, `threads` and `outer_jobs` control reproducibility and CPU use.
+`seed`, `threads` and `outer_jobs` control reproducibility and CPU use.
 `search_spaces` maps candidate names (`XGB`, `CAT`, `LGBM`, `RF`, `GBR`,
 `KNN`, `KRR`, `SVR`) to estimator parameters. Each parameter can be a fixed
 value or a search specification: `kind` = `int` / `float` with `low`, `high`
 and optional `step` / `log`, or `kind` = `categorical` with `choices`.
-
-```bash
-python train.py --data data/data/nir2_emission_dataset.csv \
-  --config settings.json --output outputs/run
-```
 
 Training writes cross-validation predictions, evaluation metrics, search
 records and the final model to `outputs/run`. The trained model and its saved
