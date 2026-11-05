@@ -16,9 +16,8 @@ selection, algorithm comparison and parameter optimization.
 | `emission_project/utils.py` | Provide shared molecular, solvent, data-reading and evaluation utilities. |
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
 | `requirements.txt` | List the Python dependencies and their versions. |
-| `configs/example.json` | Provide a complete example configuration for data splitting, feature selection and hyperparameter search across eight algorithms. |
-| `configs/paper.json` | Define the manuscript workflow and the archived eight-algorithm search spaces. |
-| `tests/test_training.py` | Check algorithm selection, prediction exports and separation of training and test labels. |
+| `configs/example.json` | Combine manuscript-specified settings with editable example defaults for other parameters. |
+| `tests/test_training.py` | Check selection rules and separation of training and test labels. |
 
 ## Usage
 
@@ -36,60 +35,35 @@ pip install -r requirements.txt
 
 Training data require `SMILES`, `Solvent` and `λem (nm)` columns.
 
-Run the manuscript workflow:
-
-```bash
-python train.py --data data/data/nir2_emission_dataset.csv \
-  --config configs/paper.json --output outputs/paper
-```
-
-The supplied dataset contains 1,033 molecule–solvent records from 483 molecular
-structures. With the paper configuration, molecule-grouped splitting assigns
-834 records / 386 molecules to training and 199 records / 97 molecules to testing.
-The workflow is:
-
-1. Run molecule-grouped 10-fold outer CV on the training set.
-2. Within each outer training fold, use shared molecule-grouped 3-fold inner CV
-   for all eight candidate algorithms. Fit the solvent vocabulary, zero-variance
-   filter, absolute Pearson-correlation filter (threshold 0.5) and random-forest
-   RFE on each inner training fold. RFE retains 82 features. KNN, KRR and SVR
-   additionally standardize their selected inputs using that training fold.
-3. Run 50 Optuna trials per algorithm and select the algorithm and parameters
-   with the lowest mean inner-fold RMSE. Refit preprocessing, feature selection
-   and the selected algorithm on the full outer training fold, then predict its
-   outer test fold. Pool the ten outer predictions to evaluate the selection
-   procedure using R², RMSE and MAE.
-4. Repeat the same 3-fold algorithm and parameter selection on all 834 training
-   records. Refit the selected pipeline on these records and predict the
-   independent test set. The final algorithm is determined by this search.
-
-Feature construction uses radius-2, 2,048-bit Morgan fingerprints, 15 RDKit
-fragment counts and training-fitted solvent one-hot features. The full training
-set produces 32 solvent features; the vocabulary and selected feature names may
-vary between folds. RF-RFE uses standardized candidate features; tree regressors
-receive the selected features in their original scale. XGBoost uses squared-error
-training loss. Exact algorithm-score ties follow the order XGB, CAT, LGBM, RF,
-GBR, KNN, KRR, SVR.
-
-`paper.json` records the manuscript's fold counts, feature count, correlation
-threshold and search budget. Implementation settings, including seed 48,
-five molecular-target stratification bins, RF-RFE settings (150 trees, depth 10,
-step 20), and parameter ranges, follow the archived 82-feature training setup.
-SVR is capped at 1,000,000 iterations; nonconvergent or invalid trials are recorded
-as pruned. The configuration runs one outer fold at a time with four CPU threads.
-There are 4,400 search trials across the ten outer folds and final selection.
-
-For a smaller demonstration run:
+Run training with the supplied configuration:
 
 ```bash
 python train.py --data data/data/nir2_emission_dataset.csv \
   --config configs/example.json --output outputs/run
 ```
 
-The example uses molecule-grouped 3-fold outer and 3-fold inner cross-validation,
-64 selected features and 3 Optuna trials per algorithm in each selection round.
-It reserves 20% of molecular groups for testing, uses seed 42 and runs one outer
-fold at a time with two CPU threads.
+The configuration uses the settings specified in the manuscript:
+
+| Setting | Value |
+| --- | --- |
+| Molecule-grouped training/test split | Approximately 80% / 20% |
+| Outer / inner cross-validation | 10 / 3 folds |
+| Morgan fingerprint length | 2,048 bits |
+| Absolute correlation threshold | 0.5 |
+| Features retained by random-forest RFE | 82 |
+| Optuna trials per algorithm per selection round | 50 |
+| Candidate algorithms | XGBoost, CatBoost, LightGBM, RF, GBR, KNN, KRR, SVR |
+
+Parameters not specified in the manuscript retain editable example defaults:
+seed 42, four molecular-target stratification bins, Morgan radius 2, RF-RFE with
+50 trees, maximum depth 8 and step 100, and the example parameter search ranges
+in `search_spaces`. CPU defaults are two threads and one outer fold at a time.
+
+Within each outer training fold, preprocessing and feature selection are fitted
+on the inner training folds. The lowest mean inner-fold RMSE selects the algorithm
+and parameters. The selected pipeline is refitted on the full outer training fold
+to predict its outer test fold. After outer CV, the same inner selection procedure
+is repeated on the full training set, followed by refitting and held-out testing.
 
 Edit `configs/example.json`, or copy it to a separate JSON file and pass that
 file with `--config`. The configuration contains:
@@ -106,38 +80,17 @@ file with `--config`. The configuration contains:
 value or a search specification: `kind` = `int` / `float` with `low`, `high`
 and optional `step` / `log`, or `kind` = `categorical` with `choices`.
 
-The paper configuration enables `export_candidate_predictions`. Training then
-also refits each candidate with its own inner-selected parameters to produce
-separate outer predictions for algorithm comparison. These predictions do not
-enter the selection criterion.
-
-Important outputs (paths are relative to the chosen output directory):
-
-| Output | Use |
-| --- | --- |
-| `Split_Assignments.csv`, `CV_Partitions.json`, `outer/*/inner/*/Partition.json`, `final/inner/*/Partition.json` | Record the train/test, outer and inner record assignments. |
-| `Nested_OOF_Predictions.csv` | Pooled outer predictions of the complete algorithm-selection procedure. |
-| `Candidate_Outer_OOF_Predictions.csv`, `Candidate_Outer_OOF_Metrics.csv` | Eight algorithms' separate outer OOF predictions and metrics for comparison plots. |
-| `Outer_Algorithm_Selections.csv` | Identify the algorithm selected in each outer fold. |
-| `final/Candidate_Inner_Scores.csv` | Compare mean three-fold RMSE for final algorithm selection. |
-| `final/candidates/*/Inner_OOF_Predictions.csv` | Plot each algorithm's inner predictions at its selected parameters. These are tuning results. |
-| `final/Training_Fit_Predictions.csv` | Plot fitted predictions on the final training set. |
-| `final/Predictions.csv` | Plot predictions on the independent test set. |
-| `Evaluation_Metrics.csv` | Report R², RMSE, MAE, record count and molecule count for outer OOF, test and training-fit predictions. |
-| `final/Model.joblib`, `final/Selector.json` | Store the fitted model, feature order, solvent vocabulary and feature settings for prediction. |
-
-Each selection round also saves Optuna trials, best parameters and fold-specific
-selectors. `Study_Config.json`, `Environment.json`, `Source_Hashes.json` and
-`Artifact_Hashes.json` record the settings, dependency versions and file hashes.
-Use a new output directory for each run. RMSE used for selection is the arithmetic
-mean of the three fold RMSEs; pooled OOF RMSE is computed over all pooled records.
+Training writes cross-validation predictions, evaluation metrics, search
+records and the final model to `outputs/run`. The trained model and its saved
+feature selector are stored in `outputs/run/final`. Use a new output directory
+for each training run.
 
 ### 3. Predict
 
 Prepare a CSV file with `SMILES` and `Solvent` columns, then run:
 
 ```bash
-python predict.py --model outputs/paper/final \
+python predict.py --model outputs/run/final \
   --input new_molecules.csv --output new_predictions.csv
 ```
 
@@ -146,9 +99,3 @@ emission wavelength in nm) and `unknown_solvent` (whether the solvent was
 absent from the model's training vocabulary). The saved selector supplies
 the feature order and fingerprint settings. Use a new output filename for
 each prediction run.
-
-### 4. Check the training logic
-
-```bash
-python -m unittest discover -s tests -v
-```
