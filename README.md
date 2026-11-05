@@ -16,8 +16,7 @@ selection, algorithm comparison and parameter optimization.
 | `emission_project/utils.py` | Provide shared molecular, solvent, data-reading and evaluation utilities. |
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
 | `requirements.txt` | List the Python dependencies and their versions. |
-| `configs/example.json` | Combine manuscript-specified settings with editable example defaults for other parameters. |
-| `tests/test_training.py` | Check selection rules and separation of training and test labels. |
+| `configs/paper.json` | Configure data splitting, feature construction, feature selection and algorithm parameter searches. |
 
 ## Usage
 
@@ -39,25 +38,25 @@ Run training with the supplied configuration:
 
 ```bash
 python train.py --data data/data/nir2_emission_dataset.csv \
-  --config configs/example.json --output outputs/run
+  --config configs/paper.json --output outputs/run
 ```
 
-The configuration uses the settings specified in the manuscript:
+The supplied configuration uses:
 
 | Setting | Value |
 | --- | --- |
 | Molecule-grouped training/test split | Approximately 80% / 20% |
 | Outer / inner cross-validation | 10 / 3 folds |
 | Morgan fingerprint length | 2,048 bits |
+| Morgan fingerprint radius | 2 |
 | Absolute correlation threshold | 0.5 |
 | Features retained by random-forest RFE | 82 |
+| RF-RFE trees / maximum depth / elimination step | 50 / 8 / 100 |
 | Optuna trials per algorithm per selection round | 50 |
 | Candidate algorithms | XGBoost, CatBoost, LightGBM, RF, GBR, KNN, KRR, SVR |
-
-Parameters not specified in the manuscript retain editable example defaults:
-seed 42, four molecular-target stratification bins, Morgan radius 2, RF-RFE with
-50 trees, maximum depth 8 and step 100, and the example parameter search ranges
-in `search_spaces`. CPU defaults are two threads and one outer fold at a time.
+| Random seed | 42 |
+| Molecular-target stratification bins | 4 |
+| CPU threads / concurrent outer folds | 2 / 1 |
 
 Within each outer training fold, preprocessing and feature selection are fitted
 on the inner training folds. The lowest mean inner-fold RMSE selects the algorithm
@@ -65,7 +64,7 @@ and parameters. The selected pipeline is refitted on the full outer training fol
 to predict its outer test fold. After outer CV, the same inner selection procedure
 is repeated on the full training set, followed by refitting and held-out testing.
 
-Edit `configs/example.json`, or copy it to a separate JSON file and pass that
+Edit `configs/paper.json`, or copy it to a separate JSON file and pass that
 file with `--config`. The configuration contains:
 
 - Data splitting: `test_size`, `outer_folds`, `inner_folds`, `stratify_bins`.

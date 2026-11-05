@@ -300,7 +300,7 @@ def build_model(trial,name,seed,threads,search_spaces):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data',required=True)
-    parser.add_argument('--config',required=True,help='Training settings, e.g. configs/example.json.')
+    parser.add_argument('--config',required=True,help='Training settings, e.g. configs/paper.json.')
     parser.add_argument('--output',required=True)
     args=parser.parse_args()
     train(args.data,args.output,load_config(args.config))
