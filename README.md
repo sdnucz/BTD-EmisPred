@@ -34,6 +34,11 @@ pip install -r requirements.txt
 
 Training data require `SMILES`, `Solvent` and `λem (nm)` columns.
 
+Solvent names are normalized consistently during training and prediction:
+PHME → TOL, TCM → CFM, PBSBUFFER → PBS, and THF\\H2O → THF/H2O.
+The dataset's `Solvent_raw` column preserves the original labels. VAC records
+are retained as a separate environment category.
+
 Run training with the supplied configuration:
 
 ```bash
