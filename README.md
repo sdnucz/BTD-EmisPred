@@ -12,6 +12,7 @@ selection, algorithm comparison and parameter optimization.
 | --- | --- |
 | `train.py` | Run nested cross-validation, select an algorithm and its parameters, fit the final model and evaluate test predictions. |
 | `predict.py` | Predict emission wavelengths for new molecule–solvent records using a trained model. |
+| `plot_review_results.py` | Recompute long-wavelength subset metrics and draw eight-algorithm outer-CV comparison figures from saved predictions. |
 | `data/dataset.py` | Clean records, group molecules, construct features and perform feature selection within training folds. |
 | `emission_project/utils.py` | Provide shared molecular, solvent, data-reading and evaluation utilities. |
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
@@ -110,3 +111,21 @@ emission wavelength in nm) and `unknown_solvent` (whether the solvent was
 absent from the model's training vocabulary). The saved selector supplies
 the feature order and fingerprint settings. Use a new output filename for
 each prediction run.
+
+### 4. Recompute comparison tables and figures
+
+Keep `export_candidate_predictions` enabled when training. Then run:
+
+```bash
+python plot_review_results.py --run outputs/run --output outputs/review_figures
+```
+
+The script checks outer-fold coverage, molecule separation, inner-score selections
+and agreement between selected-algorithm predictions and the procedure OOF predictions.
+It exports MAE/RMSE and record/molecule counts for experimental wavelengths
+at or above 1,000 nm, eight-algorithm scatter plots, fold-level comparison plots,
+and each outer fold's selected algorithm. Scatter-plot metrics pool the OOF
+predictions; comparison bars show the mean ± sample SD across ten folds, with
+all ten fold values displayed. PDF, SVG, PNG and CSV files are written to the
+specified output directory. Use `--font-dir` to load local TTF fonts; Arial is
+used when available.
