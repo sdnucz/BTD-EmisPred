@@ -157,6 +157,7 @@ def variance_filter(train_df: pd.DataFrame) -> tuple[pd.DataFrame, list[str], li
 def correlation_filter(
     train_df: pd.DataFrame,
     threshold: float,
+    protected: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, list[str], list[str]]:
     """
     Remove highly similar features using only the training partition.
@@ -170,9 +171,11 @@ def correlation_filter(
     corr_matrix = train_df[features].corr().abs()
     variance_order = train_df[features].var().sort_values(ascending=False).index.tolist()
 
-    selected_features: list[str] = []
+    selected_features: list[str] = list(protected)
     dropped_features: list[str] = []
     for feature in variance_order:
+        if feature in protected:
+            continue
         if not selected_features:
             selected_features.append(feature)
             continue
@@ -252,24 +255,56 @@ def fit_selector(structural, training, config):
         raise ValueError('Nonfinite training labels.')
     frame = x.copy()
     frame[TARGET] = y
+    protected = config.get('protected_features', [])
+    if (not isinstance(protected, list) or any(not isinstance(f, str) for f in protected)
+            or len(set(protected)) != len(protected)
+            or len(protected) > config['selected_features']
+            or any(f not in x.columns for f in protected)):
+        raise ValueError('Invalid or missing protected features.')
     variance, variance_columns, _ = variance_filter(frame)
-    correlated, candidate_columns, _ = correlation_filter(variance, config['correlation_threshold'])
+    if protected:
+        variance_columns = [f for f in x.columns if f in variance_columns or f in protected]
+        variance = frame[variance_columns + [TARGET]]
+    correlated, candidate_columns, _ = correlation_filter(
+        variance, config['correlation_threshold'], tuple(protected))
     candidates = correlated[candidate_columns]
     if candidates.shape[1] < config['selected_features']:
         raise ValueError(f'Only {candidates.shape[1]} features remain; cannot select {config["selected_features"]}.')
     scaler = StandardScaler()
-    selector = RFE(RandomForestRegressor(n_estimators=config['rfe_estimators'],
-                   max_depth=config['rfe_depth'], random_state=config['seed'], n_jobs=config['threads']),
-                   n_features_to_select=config['selected_features'], step=config['rfe_step'])
-    selector.fit(scaler.fit_transform(candidates), y)
-    selected = candidates.columns[selector.support_].tolist()
+    scaled = scaler.fit_transform(candidates)
+    if protected:
+        # Fixed columns participate in every RF fit but are never eligible for removal.
+        support = np.ones(candidates.shape[1], dtype=bool)
+        ranking = np.ones(candidates.shape[1], dtype=int)
+        locked = np.asarray([f in protected for f in candidate_columns])
+        while support.sum() > config['selected_features']:
+            active = np.flatnonzero(support)
+            forest = RandomForestRegressor(n_estimators=config['rfe_estimators'],
+                max_depth=config['rfe_depth'], random_state=config['seed'], n_jobs=config['threads'])
+            forest.fit(scaled[:, active], y)
+            ordered = active[np.argsort(forest.feature_importances_ ** 2)]
+            eligible = ordered[~locked[ordered]]
+            count = min(config['rfe_step'], int(support.sum()) - config['selected_features'])
+            support[eligible[:count]] = False
+            ranking[~support] += 1
+    else:
+        selector = RFE(RandomForestRegressor(n_estimators=config['rfe_estimators'],
+                       max_depth=config['rfe_depth'], random_state=config['seed'], n_jobs=config['threads']),
+                       n_features_to_select=config['selected_features'], step=config['rfe_step'])
+        selector.fit(scaled, y)
+        support, ranking = selector.support_, selector.ranking_
+    selected = candidates.columns[support].tolist()
     state = dict(fit_record_ids=training.record_id.astype(int).tolist(),
                  solvent_categories=categories, selected_features=selected,
                  initial_feature_count=x.shape[1], after_variance=variance_columns,
-                 after_correlation=candidate_columns, rfe_ranking=selector.ranking_.tolist(),
+                 after_correlation=candidate_columns, rfe_ranking=ranking.tolist(),
                  rfe_scaler_mean=scaler.mean_.tolist(), rfe_scaler_scale=scaler.scale_.tolist(),
                  scaling_applied_to='RF-RFE only; estimators receive raw selected features; KNN/KRR/SVR apply their own training-fold scaler',
                  unknown_solvent_policy='all-zero encoding with explicit flag', vif_filter_applied=False)
+    if protected:
+        state['protected_features'] = protected
+        state['protected_policy'] = 'Retain through variance filtering; prioritize in correlation filtering; exclude from RF-RFE elimination.'
+        state['protected_training_nonzero_counts'] = {f: int((x[f] != 0).sum()) for f in protected}
     return x[selected], y, state
 
 def prepare_fold(structural, raw, fit, valid, config):

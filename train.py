@@ -1,4 +1,4 @@
-"""Molecule-grouped nested algorithm selection, without residual correction."""
+"""Molecule-grouped nested algorithm selection for emission prediction."""
 from __future__ import annotations
 from pathlib import Path
 import argparse, hashlib, importlib.metadata, json, multiprocessing, warnings
@@ -70,6 +70,22 @@ def fit_context(structural, raw, fit, valid, config, output, compare_candidates=
         for name in config['search_spaces']:
             folder = output / 'candidates' / name
             folder.mkdir(parents=True)
+            if name == 'GBR' and config.get('fixed_gbr_parameters') is not None:
+                parameters = config['fixed_gbr_parameters']
+                scores = []
+                for number, fold in enumerate(cached):
+                    estimator = build_model(optuna.trial.FixedTrial(parameters), name,
+                                            None if config['seed'] is None else config['seed'] + number,
+                                            config['threads'], config['search_spaces'])
+                    pred = checked_fit_predict(estimator, fold['x_train'], fold['y_train'], fold['x_valid'])
+                    scores.append(float(np.sqrt(np.mean((pred - fold['y_valid']) ** 2))))
+                row = dict(algorithm=name, mean_inner_RMSE=float(np.mean(scores)), best_trial=None,
+                           parameters=parameters, inner_fold_rmse=scores, trial_attempts=0,
+                           successful_trials=0, fixed_parameter_evaluations=1)
+                candidates.append(row)
+                write_json(folder / 'Best_Parameters.json', row)
+                print(f'{output.name}: {name} (fixed), inner RMSE={row["mean_inner_RMSE"]:.4f}', flush=True)
+                continue
             study = optuna.create_study(direction='minimize', sampler=optuna.samplers.TPESampler(seed=config['seed']))
 
             def objective(trial):
@@ -223,7 +239,7 @@ def train(data, output, config):
     for path, expected in source_hashes.items():
         if hashlib.sha256(Path(path).read_bytes()).hexdigest() != expected:
             raise ValueError('Source changed during training.')
-    write_json(output / 'COMPLETED.json', {'outer_folds': len(outer), 'OOF_records': len(oof), 'training_records': len(fit), 'test_records': len(test), 'selected_algorithm': final['algorithm'], 'trial_attempts': (len(outer) + 1) * len(config['search_spaces']) * config['n_trials'], 'residual_correction': False})
+    write_json(output / 'COMPLETED.json', {'outer_folds': len(outer), 'OOF_records': len(oof), 'training_records': len(fit), 'test_records': len(test), 'selected_algorithm': final['algorithm'], 'trial_attempts': sum(json.loads((output / 'outer' / f'{i:02d}' / 'COMPLETED.json').read_text())['trial_attempts'] for i in range(len(outer))) + final['trial_attempts'], 'residual_correction': False})
     hashes = {str(f.relative_to(output)): hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted(output.rglob('*')) if f.is_file()}
     write_json(output / 'Artifact_Hashes.json', hashes)
     return final
@@ -256,6 +272,14 @@ def load_config(path):
         raise ValueError('Unsupported candidate algorithm or parameter specification.')
     if not isinstance(config.get('export_candidate_predictions',False),bool):
         raise ValueError('export_candidate_predictions must be a boolean.')
+    fixed = config.get('fixed_gbr_parameters')
+    if fixed is not None:
+        if ('GBR' not in config['search_spaces'] or not isinstance(fixed, dict) or not fixed
+                or any(isinstance(value, (dict, list)) for value in fixed.values())
+                or any(key not in GradientBoostingRegressor().get_params() for key in fixed)
+                or 'random_state' in fixed):
+            raise ValueError('fixed_gbr_parameters must contain fixed GBR hyperparameters, excluding random_state.')
+        config['search_spaces'] = {**config['search_spaces'], 'GBR': dict(fixed)}
     return config
 
 def draw_parameters(trial,space):
