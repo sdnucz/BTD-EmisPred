@@ -6,6 +6,12 @@ fingerprints, RDKit fragment counts and solvent features with machine-learning
 regression. Training uses molecule-grouped nested cross-validation for feature
 selection, algorithm comparison and parameter optimization.
 
+## Online prediction
+
+Our trained model is deployed on the [BTD-EmisPred website](https://btd-emispred.online)
+and can be used directly in your browser. Enter a molecular SMILES string and
+select a solvent to obtain the predicted emission wavelength in nm.
+
 ## Files
 
 | File | Purpose |
@@ -18,7 +24,6 @@ selection, algorithm comparison and parameter optimization.
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
 | `requirements.txt` | List the Python dependencies and their versions. |
 | `configs/paper.json` | Configure data splitting, feature construction, feature selection and algorithm parameter searches. |
-| `configs/estimator_parameters.json` | Record candidate hyperparameters and selections from the previous LightGBM run for reference. |
 
 ## Usage
 
@@ -131,15 +136,3 @@ predictions; comparison bars show the mean ± sample SD across ten folds, with
 all ten fold values displayed. PDF, SVG, PNG and CSV files are written to the
 specified output directory. Use `--font-dir` to load local TTF fonts; Arial is
 used when available.
-
-## Previous training parameters
-
-The [training-parameters release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.1.3-lightgbm-parameters)
-provides `BTD-EmisPred-LightGBM-parameters.zip`, containing `paper.json`,
-`estimator_parameters.json` and a short usage guide for that previous run.
-
-`configs/paper.json` configures the current eight-algorithm search. The linked
-release and `estimator_parameters.json` preserve the previous run, in which GBR
-used fixed parameters and the final selection was LightGBM. They are historical
-references, not results of the current search. `train.py` selects the final
-algorithm from the new inner-CV scores and does not read `estimator_parameters.json`.
