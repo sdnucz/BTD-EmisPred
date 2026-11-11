@@ -18,7 +18,7 @@ selection, algorithm comparison and parameter optimization.
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
 | `requirements.txt` | List the Python dependencies and their versions. |
 | `configs/paper.json` | Configure data splitting, feature construction, feature selection and algorithm parameter searches. |
-| `configs/estimator_parameters.json` | List candidate hyperparameters and the selected algorithm for each outer fold and final fitting. |
+| `configs/estimator_parameters.json` | Record candidate hyperparameters and selections from the previous LightGBM run for reference. |
 
 ## Usage
 
@@ -60,7 +60,7 @@ The supplied configuration uses:
 | Absolute correlation threshold | 0.5 |
 | Features retained by random-forest RFE | 82, including protected Morgan_1073 |
 | RF-RFE trees / maximum depth / elimination step | 150 / 10 / 20 |
-| Optuna trials per searched algorithm per selection round | 50 (GBR uses fixed parameters) |
+| Optuna trials per algorithm per selection round | 50 for each of the eight algorithms |
 | Candidate algorithms | XGBoost, CatBoost, LightGBM, RF, GBR, KNN, KRR, SVR |
 | Random seed | 2 |
 | Molecular-target stratification bins | 5 |
@@ -68,8 +68,8 @@ The supplied configuration uses:
 
 Within each outer training fold, preprocessing and feature selection are fitted
 on the inner training folds. The lowest mean inner-fold RMSE selects the algorithm
-and parameters. Seven algorithms undergo Optuna searches; GBR is evaluated
-on the same inner folds using `fixed_gbr_parameters`. The selected pipeline
+and parameters. All eight algorithms undergo 50 Optuna trials each on the same
+inner folds, including GBR. The selected pipeline
 is refitted on the full outer training fold
 to predict its outer test fold. After outer CV, the same inner selection procedure
 is repeated on the full training set, followed by refitting and held-out testing.
@@ -81,7 +81,7 @@ file with `--config`. The configuration contains:
 - Feature construction: `morgan_radius`, `morgan_bits`.
 - Feature selection: `selected_features`, `correlation_threshold`,
   `rfe_estimators`, `rfe_depth`, `rfe_step`, `protected_features`.
-- Parameter search: `n_trials`, `search_spaces`, `fixed_gbr_parameters`.
+- Parameter search: `n_trials`, `search_spaces`.
 
 `seed`, `threads` and `outer_jobs` control reproducibility and CPU use.
 `search_spaces` maps candidate names (`XGB`, `CAT`, `LGBM`, `RF`, `GBR`,
@@ -132,14 +132,14 @@ all ten fold values displayed. PDF, SVG, PNG and CSV files are written to the
 specified output directory. Use `--font-dir` to load local TTF fonts; Arial is
 used when available.
 
-## Training parameters
+## Previous training parameters
 
 The [training-parameters release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.1.3-lightgbm-parameters)
 provides `BTD-EmisPred-LightGBM-parameters.zip`, containing `paper.json`,
-`estimator_parameters.json` and a short usage guide. These JSON files are also
-available in `configs/`.
+`estimator_parameters.json` and a short usage guide for that previous run.
 
-`paper.json` configures the training command above. `estimator_parameters.json`
-records the candidate hyperparameters and selected algorithm for each of the
-ten outer folds and the final selection round; it is a parameter reference,
-not an additional input to `train.py`. The saved final selection is LightGBM.
+`configs/paper.json` configures the current eight-algorithm search. The linked
+release and `estimator_parameters.json` preserve the previous run, in which GBR
+used fixed parameters and the final selection was LightGBM. They are historical
+references, not results of the current search. `train.py` selects the final
+algorithm from the new inner-CV scores and does not read `estimator_parameters.json`.

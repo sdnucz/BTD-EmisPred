@@ -203,13 +203,48 @@
       }
     },
     "GBR": {
-      "n_estimators": 300,
-      "learning_rate": 0.06725055383088001,
-      "max_depth": 5,
-      "min_samples_split": 4,
-      "min_samples_leaf": 4,
-      "subsample": 0.7448025720457776,
-      "max_features": null
+      "n_estimators": {
+        "kind": "int",
+        "low": 100,
+        "high": 1000,
+        "step": 100
+      },
+      "learning_rate": {
+        "kind": "float",
+        "low": 0.01,
+        "high": 0.2,
+        "log": true
+      },
+      "max_depth": {
+        "kind": "int",
+        "low": 2,
+        "high": 6
+      },
+      "min_samples_split": {
+        "kind": "int",
+        "low": 2,
+        "high": 12
+      },
+      "min_samples_leaf": {
+        "kind": "int",
+        "low": 1,
+        "high": 8
+      },
+      "subsample": {
+        "kind": "float",
+        "low": 0.5,
+        "high": 1
+      },
+      "max_features": {
+        "kind": "categorical",
+        "choices": [
+          null,
+          "sqrt",
+          "log2",
+          0.5,
+          0.8
+        ]
+      }
     },
     "KNN": {
       "n_neighbors": {
@@ -303,14 +338,5 @@
   "residual_correction": false,
   "protected_features": [
     "Morgan_1073"
-  ],
-  "fixed_gbr_parameters": {
-    "n_estimators": 300,
-    "learning_rate": 0.06725055383088001,
-    "max_depth": 5,
-    "min_samples_split": 4,
-    "min_samples_leaf": 4,
-    "subsample": 0.7448025720457776,
-    "max_features": null
-  }
+  ]
 }
