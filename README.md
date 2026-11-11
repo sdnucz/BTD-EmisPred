@@ -129,3 +129,12 @@ predictions; comparison bars show the mean ± sample SD across ten folds, with
 all ten fold values displayed. PDF, SVG, PNG and CSV files are written to the
 specified output directory. Use `--font-dir` to load local TTF fonts; Arial is
 used when available.
+
+## Archived LightGBM analysis
+
+The frozen seed-2 analysis is available in the
+[v1.1.0-lightgbm-seed2 release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.1.0-lightgbm-seed2).
+Download `BTD-EmisPred-LightGBM-seed2.zip` for the matching dataset,
+configuration, fixed partitions, predictions, fitted models and reproduction
+instructions. The archive README describes its data snapshot and verification
+steps.
