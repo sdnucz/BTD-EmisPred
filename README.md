@@ -134,7 +134,7 @@ used when available.
 ## Training parameters
 
 The [training-parameters release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.1.2-lightgbm-parameters)
-provides `BTD-EmisPred-training-parameters.zip`, containing `paper.json`,
+provides `BTD-EmisPred-LightGBM-parameters.zip`, containing `paper.json`,
 `estimator_parameters.json` and a short usage guide. These JSON files are also
 available in `configs/`.
 
