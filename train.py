@@ -18,6 +18,7 @@ from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from data.dataset import TARGET, load_data, featurize, group_holdout, group_folds, check_partition, inner_splits, prepare_fold
 from emission_project.utils import compute_metrics
+from frozen_partitions import load_frozen, inner_for_parent
 
 def write_json(path, value):
     Path(path).write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False), encoding='utf-8')
@@ -48,7 +49,7 @@ def prediction_frame(raw, indices, prediction, unknown):
     result['unknown_solvent'] = unknown
     return result
 
-def fit_context(structural, raw, fit, valid, config, output, compare_candidates=False):
+def fit_context(structural, raw, fit, valid, config, output, compare_candidates=False, frozen=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     fit = np.asarray(fit, dtype=int)
@@ -57,7 +58,9 @@ def fit_context(structural, raw, fit, valid, config, output, compare_candidates=
     write_json(output / 'Partition.json', {'fit_record_ids': fit.tolist(), 'valid_record_ids': valid.tolist()})
     with threadpool_limits(limits=config['threads']):
         cached = []
-        splits = inner_splits(raw, fit, config)
+        splits = (inner_splits(raw, fit, config) if frozen is None else
+                  [(np.asarray(p['fit_record_ids']), np.asarray(p['valid_record_ids']))
+                   for p in inner_for_parent(frozen, fit.tolist())])
         for number, (a, b) in enumerate(splits):
             fold = prepare_fold(structural, raw, a, b, config)
             folder = output / 'inner' / f'{number:02d}'
@@ -150,14 +153,19 @@ def evaluation_rows(frame, label):
             rows.append(dict(evaluation=label, subset=subset, n=len(part), n_molecules=part.canonical_smiles.nunique(), **compute_metrics(part[TARGET].to_numpy(float), part.prediction_nm.to_numpy(float))))
     return rows
 
-def train(data, output, config):
+def train(data, output, config, partitions=None):
     output = Path(output)
     if output.exists():
         raise FileExistsError(f'Output already exists: {output}')
     if config['residual_correction'] is not False:
         raise ValueError('This release has no residual correction.')
     raw = load_data(data)
-    fit, test = group_holdout(raw[TARGET].to_numpy(), raw.canonical_smiles.to_numpy(), config['seed'], config['test_size'], config['stratify_bins'])
+    frozen = load_frozen(partitions, data, raw.canonical_smiles.tolist(), config) if partitions else None
+    if frozen is None:
+        fit, test = group_holdout(raw[TARGET].to_numpy(), raw.canonical_smiles.to_numpy(), config['seed'], config['test_size'], config['stratify_bins'])
+    else:
+        fit = np.asarray(frozen['holdout']['fit_record_ids'])
+        test = np.asarray(frozen['holdout']['valid_record_ids'])
     check_partition(raw, fit, test)
     output.mkdir(parents=True, exist_ok=False)
     write_json(output / 'Study_Config.json', config)
@@ -166,7 +174,13 @@ def train(data, output, config):
     split.loc[test, 'split'] = 'test'
     split.to_csv(output / 'Split_Assignments.csv', index=False)
     structural = featurize(raw, [], radius=config['morgan_radius'], bits=config['morgan_bits'])
-    outer = [(fit[a], fit[b]) for a, b in group_folds(raw.iloc[fit][TARGET].to_numpy(), raw.iloc[fit].canonical_smiles.to_numpy(), config['seed'], config['outer_folds'], config['stratify_bins'])]
+    if frozen is None:
+        outer = [(fit[a], fit[b]) for a, b in group_folds(raw.iloc[fit][TARGET].to_numpy(), raw.iloc[fit].canonical_smiles.to_numpy(), config['seed'], config['outer_folds'], config['stratify_bins'])]
+    else:
+        outer = [(np.asarray(frozen['contexts'][name]['partition']['fit_record_ids']),
+                  np.asarray(frozen['contexts'][name]['partition']['valid_record_ids']))
+                 for name in frozen['outer_order']]
+        write_json(output / 'Frozen_Partitions.json', frozen)
     coverage = np.concatenate([b for _, b in outer])
     if sorted(coverage.tolist()) != sorted(fit.tolist()):
         raise ValueError('Incomplete outer OOF coverage.')
@@ -174,12 +188,15 @@ def train(data, output, config):
         check_partition(raw, a, b)
     write_json(output / 'CV_Partitions.json', {'outer_folds': [{'fold': i + 1, 'fit_record_ids': a.tolist(), 'valid_record_ids': b.tolist()} for i, (a, b) in enumerate(outer)]})
     source_files = [Path(data), Path(__file__), Path(__file__).parent / 'predict.py', Path(__file__).parent / 'data/dataset.py', Path(__file__).parent / 'emission_project/utils.py']
+    source_files.append(Path(__file__).parent / 'frozen_partitions.py')
+    if partitions:
+        source_files.extend([Path(partitions), Path(partitions).with_name('Dataset_SHA256.txt')])
     source_hashes = {str(f.resolve()): hashlib.sha256(f.read_bytes()).hexdigest() for f in source_files}
     write_json(output / 'Source_Hashes.json', source_hashes)
     write_json(output / 'Environment.json', {name: importlib.metadata.version(name) for name in ['numpy', 'pandas', 'scikit-learn', 'xgboost', 'rdkit', 'optuna', 'catboost', 'lightgbm']})
     with ProcessPoolExecutor(max_workers=config['outer_jobs'], mp_context=multiprocessing.get_context('spawn')) as pool:
         futures = {pool.submit(fit_context, structural, raw, a, b, config, output / 'outer' / f'{i:02d}',
-                               compare_candidates=config.get('export_candidate_predictions', False)): i for i, (a, b) in enumerate(outer)}
+                               compare_candidates=config.get('export_candidate_predictions', False), frozen=frozen): i for i, (a, b) in enumerate(outer)}
         for future in as_completed(futures):
             future.result()
     pieces = []
@@ -215,7 +232,7 @@ def train(data, output, config):
                                       for row in evaluation_rows(combined, 'fixed_algorithm_outer_OOF'))
         pd.concat(comparisons).to_csv(output / 'Candidate_Outer_OOF_Predictions.csv', index=False)
         pd.DataFrame(comparison_metrics).to_csv(output / 'Candidate_Outer_OOF_Metrics.csv', index=False)
-    final = fit_context(structural, raw, fit, test, config, output / 'final')
+    final = fit_context(structural, raw, fit, test, config, output / 'final', frozen=frozen)
     heldout = pd.read_csv(output / 'final/Predictions.csv')
     fitted = pd.read_csv(output / 'final/Training_Fit_Predictions.csv')
     pd.DataFrame(evaluation_rows(oof, 'outer_OOF') + evaluation_rows(heldout, 'independent_test')
@@ -304,8 +321,9 @@ def main():
     parser.add_argument('--data',required=True)
     parser.add_argument('--config',required=True,help='Training settings, e.g. configs/paper.json.')
     parser.add_argument('--output',required=True)
+    parser.add_argument('--partitions', help='Frozen_Partitions.json with adjacent Dataset_SHA256.txt.')
     args=parser.parse_args()
-    train(args.data,args.output,load_config(args.config))
+    train(args.data,args.output,load_config(args.config),args.partitions)
 
 if __name__=='__main__':
     main()

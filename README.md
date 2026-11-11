@@ -24,6 +24,10 @@ select a solvent to obtain the predicted emission wavelength in nm.
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
 | `requirements.txt` | List the Python dependencies and their versions. |
 | `configs/paper.json` | Configure data splitting, feature construction, feature selection and algorithm parameter searches. |
+| `frozen_partitions.py` | Validate and load fixed molecule-grouped partitions. |
+| `splits/Frozen_Partitions.json` | Record the training/test split, ten outer folds and three inner folds for each selection round. |
+| `splits/Dataset_SHA256.txt` | Bind the fixed partitions to the supplied dataset. |
+| `configs/Selector.json` | Reference full-training feature order, solvent vocabulary and RF-RFE preprocessing state. |
 
 ## Usage
 
@@ -51,8 +55,18 @@ Run training with the supplied configuration:
 
 ```bash
 python train.py --data data/data/nir2_emission_dataset.csv \
-  --config configs/paper.json --output outputs/run
+  --config configs/paper.json --partitions splits/Frozen_Partitions.json \
+  --output outputs/run
 ```
+
+The fixed split contains 816 training records (366 molecules) and 196 test
+records (94 molecules), with no molecule shared between them. Partition IDs are
+zero-based `record_id` values assigned by `load_data` after cleaning and
+deduplication, rather than source molecule numbers. The archive includes three
+inner folds for each outer training set and for final selection on all training
+records. The loader checks dataset integrity, fold coverage and molecular separation.
+
+For a different dataset, omit `--partitions` to generate splits using the configuration.
 
 The supplied configuration uses:
 
@@ -98,6 +112,11 @@ and optional `step` / `log`, or `kind` = `categorical` with `choices`.
 correlation filtering and RF-RFE. They count toward the total of 82 features.
 LightGBM participates in algorithm selection and uses the same saved-feature
 prediction interface as the other estimators.
+
+`configs/Selector.json` records the 82 features obtained on the fixed full
+training set with `configs/paper.json`. It is a reference for checking the final
+selector; training refits feature selection separately in every training fold.
+Use the selector saved alongside each trained model for prediction.
 
 Training writes cross-validation predictions, evaluation metrics, search
 records and the final model to `outputs/run`. The trained model and its saved
