@@ -133,7 +133,7 @@ used when available.
 
 ## Training parameters
 
-The [training-parameters release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.1.1-training-parameters)
+The [training-parameters release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.1.2-lightgbm-parameters)
 provides `BTD-EmisPred-training-parameters.zip`, containing `paper.json`,
 `estimator_parameters.json` and a short usage guide. These JSON files are also
 available in `configs/`.
@@ -141,4 +141,4 @@ available in `configs/`.
 `paper.json` configures the training command above. `estimator_parameters.json`
 records the candidate hyperparameters and selected algorithm for each of the
 ten outer folds and the final selection round; it is a parameter reference,
-not an additional input to `train.py`.
+not an additional input to `train.py`. The saved final selection is LightGBM.
