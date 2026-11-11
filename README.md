@@ -18,6 +18,7 @@ selection, algorithm comparison and parameter optimization.
 | `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
 | `requirements.txt` | List the Python dependencies and their versions. |
 | `configs/paper.json` | Configure data splitting, feature construction, feature selection and algorithm parameter searches. |
+| `configs/estimator_parameters.json` | List candidate hyperparameters and the selected algorithm for each outer fold and final fitting. |
 
 ## Usage
 
@@ -130,11 +131,14 @@ all ten fold values displayed. PDF, SVG, PNG and CSV files are written to the
 specified output directory. Use `--font-dir` to load local TTF fonts; Arial is
 used when available.
 
-## Archived LightGBM analysis
+## Training parameters
 
-The frozen seed-2 analysis is available in the
-[v1.1.0-lightgbm-seed2 release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.1.0-lightgbm-seed2).
-Download `BTD-EmisPred-LightGBM-seed2.zip` for the matching dataset,
-configuration, fixed partitions, predictions, fitted models and reproduction
-instructions. The archive README describes its data snapshot and verification
-steps.
+The [training-parameters release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.1.1-training-parameters)
+provides `BTD-EmisPred-training-parameters.zip`, containing `paper.json`,
+`estimator_parameters.json` and a short usage guide. These JSON files are also
+available in `configs/`.
+
+`paper.json` configures the training command above. `estimator_parameters.json`
+records the candidate hyperparameters and selected algorithm for each of the
+ten outer folds and the final selection round; it is a parameter reference,
+not an additional input to `train.py`.

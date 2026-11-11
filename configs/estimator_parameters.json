@@ -1,0 +1,783 @@
+{
+  "outer/00": {
+    "selected_algorithm": "XGB",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 800,
+        "max_depth": 5,
+        "learning_rate": 0.021417975687901776,
+        "subsample": 0.9425233518552921,
+        "colsample_bytree": 0.9344819388484933,
+        "min_child_weight": 2,
+        "gamma": 0.3574610223581651,
+        "reg_alpha": 0.1910967224493225,
+        "reg_lambda": 1.0056468440207713
+      },
+      "CAT": {
+        "iterations": 700,
+        "depth": 4,
+        "learning_rate": 0.06810646808870702,
+        "l2_leaf_reg": 0.39321313541807296,
+        "random_strength": 2.526183600092746,
+        "bagging_temperature": 1.9344632555927965
+      },
+      "LGBM": {
+        "n_estimators": 1100,
+        "learning_rate": 0.029543562652387823,
+        "num_leaves": 106,
+        "max_depth": 6,
+        "min_child_samples": 8,
+        "subsample": 0.6926784242188211,
+        "colsample_bytree": 0.7560946098812026,
+        "reg_alpha": 0.002396038477699207,
+        "reg_lambda": 0.0024804349943738295
+      },
+      "RF": {
+        "n_estimators": 600,
+        "max_depth": 20,
+        "min_samples_split": 5,
+        "min_samples_leaf": 1,
+        "max_features": 0.6,
+        "bootstrap": false
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 4,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 2
+      },
+      "KRR": {
+        "alpha": 0.5999396558183244,
+        "gamma": 0.01888152374050087,
+        "kernel": "polynomial",
+        "degree": 2
+      },
+      "SVR": {
+        "C": 514.2667091097459,
+        "gamma": 0.002695325760624863,
+        "epsilon": 0.01442798918191333,
+        "kernel": "rbf",
+        "degree": 2
+      }
+    }
+  },
+  "outer/01": {
+    "selected_algorithm": "CAT",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 1200,
+        "max_depth": 4,
+        "learning_rate": 0.017218682443822332,
+        "subsample": 0.5729292665757196,
+        "colsample_bytree": 0.5632555168790867,
+        "min_child_weight": 1,
+        "gamma": 0.06215562576464756,
+        "reg_alpha": 0.15531506965763628,
+        "reg_lambda": 0.6357690370496056
+      },
+      "CAT": {
+        "iterations": 1000,
+        "depth": 4,
+        "learning_rate": 0.0730368535718049,
+        "l2_leaf_reg": 0.15898750003681486,
+        "random_strength": 1.2273522065265534,
+        "bagging_temperature": 3.320601182866413
+      },
+      "LGBM": {
+        "n_estimators": 1100,
+        "learning_rate": 0.08545097358151081,
+        "num_leaves": 62,
+        "max_depth": 7,
+        "min_child_samples": 21,
+        "subsample": 0.7987508696921772,
+        "colsample_bytree": 0.5042533329727882,
+        "reg_alpha": 8.164515658405336e-05,
+        "reg_lambda": 0.0021939649223211167
+      },
+      "RF": {
+        "n_estimators": 800,
+        "max_depth": 12,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "max_features": 0.4,
+        "bootstrap": false
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 4,
+        "weights": "distance",
+        "metric": "minkowski",
+        "p": 1
+      },
+      "KRR": {
+        "alpha": 0.012873090529187226,
+        "gamma": 0.004935915298421202,
+        "kernel": "laplacian",
+        "degree": 4
+      },
+      "SVR": {
+        "C": 951.4988821213261,
+        "gamma": 0.004195470082647852,
+        "epsilon": 0.03822970741855031,
+        "kernel": "rbf",
+        "degree": 3
+      }
+    }
+  },
+  "outer/02": {
+    "selected_algorithm": "XGB",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 1000,
+        "max_depth": 6,
+        "learning_rate": 0.02429795590935067,
+        "subsample": 0.8647236312564393,
+        "colsample_bytree": 0.5534581387647338,
+        "min_child_weight": 5,
+        "gamma": 0.20616170488715382,
+        "reg_alpha": 0.00906129627400076,
+        "reg_lambda": 1.1155733790098488
+      },
+      "CAT": {
+        "iterations": 1100,
+        "depth": 8,
+        "learning_rate": 0.019309900758080714,
+        "l2_leaf_reg": 0.425218734265851,
+        "random_strength": 3.114522876994315,
+        "bagging_temperature": 1.2984133021159103
+      },
+      "LGBM": {
+        "n_estimators": 400,
+        "learning_rate": 0.04156440155606387,
+        "num_leaves": 46,
+        "max_depth": 8,
+        "min_child_samples": 14,
+        "subsample": 0.6985319450352339,
+        "colsample_bytree": 0.5537020164660725,
+        "reg_alpha": 0.0019798172683135433,
+        "reg_lambda": 0.002272996128227804
+      },
+      "RF": {
+        "n_estimators": 800,
+        "max_depth": null,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "bootstrap": true
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 3,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 1
+      },
+      "KRR": {
+        "alpha": 0.9293670529354497,
+        "gamma": 0.007943664516556601,
+        "kernel": "polynomial",
+        "degree": 3
+      },
+      "SVR": {
+        "C": 799.9592785594522,
+        "gamma": 0.004213961821652563,
+        "epsilon": 10.82581418964439,
+        "kernel": "rbf",
+        "degree": 2
+      }
+    }
+  },
+  "outer/03": {
+    "selected_algorithm": "CAT",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 800,
+        "max_depth": 4,
+        "learning_rate": 0.03941069953831173,
+        "subsample": 0.8414036633976895,
+        "colsample_bytree": 0.5505662320718752,
+        "min_child_weight": 1,
+        "gamma": 0.9028692344208502,
+        "reg_alpha": 2.4342795557123047,
+        "reg_lambda": 0.5320243437508246
+      },
+      "CAT": {
+        "iterations": 700,
+        "depth": 6,
+        "learning_rate": 0.04566299922796972,
+        "l2_leaf_reg": 0.4237641054881711,
+        "random_strength": 4.740829588829849,
+        "bagging_temperature": 2.9777439729888266
+      },
+      "LGBM": {
+        "n_estimators": 800,
+        "learning_rate": 0.030718204074437566,
+        "num_leaves": 18,
+        "max_depth": 6,
+        "min_child_samples": 8,
+        "subsample": 0.9656628978226155,
+        "colsample_bytree": 0.6332675212329144,
+        "reg_alpha": 8.52911926126873,
+        "reg_lambda": 0.21010955010991136
+      },
+      "RF": {
+        "n_estimators": 1000,
+        "max_depth": null,
+        "min_samples_split": 4,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "bootstrap": false
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 4,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 2
+      },
+      "KRR": {
+        "alpha": 0.5999396558183244,
+        "gamma": 0.01888152374050087,
+        "kernel": "polynomial",
+        "degree": 2
+      },
+      "SVR": {
+        "C": 514.2667091097459,
+        "gamma": 0.002695325760624863,
+        "epsilon": 0.01442798918191333,
+        "kernel": "rbf",
+        "degree": 2
+      }
+    }
+  },
+  "outer/04": {
+    "selected_algorithm": "CAT",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 1100,
+        "max_depth": 3,
+        "learning_rate": 0.09636907085660147,
+        "subsample": 0.6256318729995228,
+        "colsample_bytree": 0.6028704623053588,
+        "min_child_weight": 2,
+        "gamma": 0.38993921438453305,
+        "reg_alpha": 0.00011722637056769162,
+        "reg_lambda": 5.446094814919075
+      },
+      "CAT": {
+        "iterations": 600,
+        "depth": 7,
+        "learning_rate": 0.041067435411777965,
+        "l2_leaf_reg": 0.03432217926981398,
+        "random_strength": 3.9085817156803455,
+        "bagging_temperature": 3.8849938177492684
+      },
+      "LGBM": {
+        "n_estimators": 900,
+        "learning_rate": 0.058022329713221174,
+        "num_leaves": 94,
+        "max_depth": 6,
+        "min_child_samples": 22,
+        "subsample": 0.7464916719052029,
+        "colsample_bytree": 0.5479859110908946,
+        "reg_alpha": 1.1469083319255156,
+        "reg_lambda": 0.7098439484134117
+      },
+      "RF": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_split": 5,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "bootstrap": true
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 4,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 2
+      },
+      "KRR": {
+        "alpha": 0.159296969950307,
+        "gamma": 0.008644960732102193,
+        "kernel": "polynomial",
+        "degree": 3
+      },
+      "SVR": {
+        "C": 509.57340694883504,
+        "gamma": 0.0014476969738368023,
+        "epsilon": 6.28314120546997,
+        "kernel": "sigmoid",
+        "degree": 2
+      }
+    }
+  },
+  "outer/05": {
+    "selected_algorithm": "CAT",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 1000,
+        "max_depth": 5,
+        "learning_rate": 0.017614030402036608,
+        "subsample": 0.5771262687693335,
+        "colsample_bytree": 0.654703259823193,
+        "min_child_weight": 5,
+        "gamma": 0.713289084131572,
+        "reg_alpha": 1.6641160273293334,
+        "reg_lambda": 0.8992993878688955
+      },
+      "CAT": {
+        "iterations": 700,
+        "depth": 6,
+        "learning_rate": 0.02278862051281528,
+        "l2_leaf_reg": 0.11217476959192307,
+        "random_strength": 3.626932932140776,
+        "bagging_temperature": 0.748144533949031
+      },
+      "LGBM": {
+        "n_estimators": 500,
+        "learning_rate": 0.034711257547827265,
+        "num_leaves": 60,
+        "max_depth": 9,
+        "min_child_samples": 12,
+        "subsample": 0.9173490056961309,
+        "colsample_bytree": 0.5006042459970198,
+        "reg_alpha": 5.0377025727841565,
+        "reg_lambda": 7.08071394708871
+      },
+      "RF": {
+        "n_estimators": 600,
+        "max_depth": 12,
+        "min_samples_split": 5,
+        "min_samples_leaf": 1,
+        "max_features": 0.4,
+        "bootstrap": false
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 4,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 2
+      },
+      "KRR": {
+        "alpha": 0.0021450225717099297,
+        "gamma": 0.006768684722659314,
+        "kernel": "laplacian",
+        "degree": 3
+      },
+      "SVR": {
+        "C": 496.04028949795264,
+        "gamma": 0.0030803391786634673,
+        "epsilon": 0.06904536030387493,
+        "kernel": "rbf",
+        "degree": 3
+      }
+    }
+  },
+  "outer/06": {
+    "selected_algorithm": "XGB",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 900,
+        "max_depth": 5,
+        "learning_rate": 0.02113729604566978,
+        "subsample": 0.7310252173120323,
+        "colsample_bytree": 0.5852395961355638,
+        "min_child_weight": 1,
+        "gamma": 0.07345992057798323,
+        "reg_alpha": 0.030149358130937186,
+        "reg_lambda": 0.64209284490111
+      },
+      "CAT": {
+        "iterations": 900,
+        "depth": 3,
+        "learning_rate": 0.06776746069376334,
+        "l2_leaf_reg": 0.5936200272632175,
+        "random_strength": 1.5162934621936277,
+        "bagging_temperature": 1.2934115273436566
+      },
+      "LGBM": {
+        "n_estimators": 1200,
+        "learning_rate": 0.030366577349058697,
+        "num_leaves": 38,
+        "max_depth": 9,
+        "min_child_samples": 9,
+        "subsample": 0.6781486758284198,
+        "colsample_bytree": 0.5460498375319738,
+        "reg_alpha": 0.0012107185611830713,
+        "reg_lambda": 0.0015224008084809863
+      },
+      "RF": {
+        "n_estimators": 500,
+        "max_depth": 30,
+        "min_samples_split": 5,
+        "min_samples_leaf": 1,
+        "max_features": 0.4,
+        "bootstrap": false
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 3,
+        "weights": "distance",
+        "metric": "minkowski",
+        "p": 1
+      },
+      "KRR": {
+        "alpha": 0.16185076526816103,
+        "gamma": 0.0059753777601539056,
+        "kernel": "polynomial",
+        "degree": 3
+      },
+      "SVR": {
+        "C": 647.16855398548,
+        "gamma": 0.0008413448108056902,
+        "epsilon": 0.02092999812476006,
+        "kernel": "sigmoid",
+        "degree": 2
+      }
+    }
+  },
+  "outer/07": {
+    "selected_algorithm": "XGB",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 1000,
+        "max_depth": 4,
+        "learning_rate": 0.026907471421832297,
+        "subsample": 0.5650262442317183,
+        "colsample_bytree": 0.8158895013333742,
+        "min_child_weight": 5,
+        "gamma": 0.9835786170800085,
+        "reg_alpha": 0.6725386029015472,
+        "reg_lambda": 0.6102418051885671
+      },
+      "CAT": {
+        "iterations": 700,
+        "depth": 4,
+        "learning_rate": 0.032647379140208946,
+        "l2_leaf_reg": 0.06445266936100628,
+        "random_strength": 1.086218005585459,
+        "bagging_temperature": 1.0297760418604005
+      },
+      "LGBM": {
+        "n_estimators": 500,
+        "learning_rate": 0.052834608604201166,
+        "num_leaves": 54,
+        "max_depth": 7,
+        "min_child_samples": 14,
+        "subsample": 0.7199266224901171,
+        "colsample_bytree": 0.5244570187735128,
+        "reg_alpha": 0.005046142845059611,
+        "reg_lambda": 0.034380252265229776
+      },
+      "RF": {
+        "n_estimators": 800,
+        "max_depth": 12,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "max_features": 0.4,
+        "bootstrap": false
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 4,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 2
+      },
+      "KRR": {
+        "alpha": 0.043479831044731514,
+        "gamma": 0.007083497175617469,
+        "kernel": "laplacian",
+        "degree": 3
+      },
+      "SVR": {
+        "C": 998.8824225363087,
+        "gamma": 0.0009279255627974355,
+        "epsilon": 0.2419588900080105,
+        "kernel": "rbf",
+        "degree": 2
+      }
+    }
+  },
+  "outer/08": {
+    "selected_algorithm": "RF",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 300,
+        "max_depth": 5,
+        "learning_rate": 0.02916836660606214,
+        "subsample": 0.9528607792407503,
+        "colsample_bytree": 0.8075152824610553,
+        "min_child_weight": 7,
+        "gamma": 0.20165641782715285,
+        "reg_alpha": 0.33845305353207406,
+        "reg_lambda": 1.1717878836572373
+      },
+      "CAT": {
+        "iterations": 900,
+        "depth": 5,
+        "learning_rate": 0.058069064215679825,
+        "l2_leaf_reg": 0.01215794453652159,
+        "random_strength": 3.5480654668817015,
+        "bagging_temperature": 1.3974577606016474
+      },
+      "LGBM": {
+        "n_estimators": 200,
+        "learning_rate": 0.05066938624475851,
+        "num_leaves": 86,
+        "max_depth": 9,
+        "min_child_samples": 9,
+        "subsample": 0.5354188486010676,
+        "colsample_bytree": 0.552402263373109,
+        "reg_alpha": 0.024580666763071232,
+        "reg_lambda": 0.16964498540068274
+      },
+      "RF": {
+        "n_estimators": 800,
+        "max_depth": 16,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "max_features": 0.4,
+        "bootstrap": true
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 6,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 2
+      },
+      "KRR": {
+        "alpha": 0.9293670529354497,
+        "gamma": 0.007943664516556601,
+        "kernel": "polynomial",
+        "degree": 3
+      },
+      "SVR": {
+        "C": 129.5018264433177,
+        "gamma": 0.003920881961483027,
+        "epsilon": 12.320894630941519,
+        "kernel": "sigmoid",
+        "degree": 2
+      }
+    }
+  },
+  "outer/09": {
+    "selected_algorithm": "CAT",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 600,
+        "max_depth": 6,
+        "learning_rate": 0.015118153666082212,
+        "subsample": 0.6600815561754191,
+        "colsample_bytree": 0.793721019011831,
+        "min_child_weight": 3,
+        "gamma": 0.21212305759479944,
+        "reg_alpha": 0.14769909295188996,
+        "reg_lambda": 0.6793722886649842
+      },
+      "CAT": {
+        "iterations": 600,
+        "depth": 7,
+        "learning_rate": 0.03127459619656722,
+        "l2_leaf_reg": 0.059905266724723114,
+        "random_strength": 3.8552518819850525,
+        "bagging_temperature": 1.1558388350686422
+      },
+      "LGBM": {
+        "n_estimators": 600,
+        "learning_rate": 0.011539779137653052,
+        "num_leaves": 126,
+        "max_depth": 7,
+        "min_child_samples": 5,
+        "subsample": 0.9666997665588065,
+        "colsample_bytree": 0.5523235993659132,
+        "reg_alpha": 1.9307357098971378,
+        "reg_lambda": 0.013014189157757565
+      },
+      "RF": {
+        "n_estimators": 800,
+        "max_depth": 16,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "max_features": 0.4,
+        "bootstrap": true
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 4,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 2
+      },
+      "KRR": {
+        "alpha": 0.9293670529354497,
+        "gamma": 0.007943664516556601,
+        "kernel": "polynomial",
+        "degree": 3
+      },
+      "SVR": {
+        "C": 319.00536100179846,
+        "gamma": 0.0014204240395099751,
+        "epsilon": 8.09344145913001,
+        "kernel": "sigmoid",
+        "degree": 2
+      }
+    }
+  },
+  "final": {
+    "selected_algorithm": "XGB",
+    "hyperparameters": {
+      "XGB": {
+        "n_estimators": 1200,
+        "max_depth": 6,
+        "learning_rate": 0.018830626873809257,
+        "subsample": 0.6927561184296669,
+        "colsample_bytree": 0.9800052604550462,
+        "min_child_weight": 4,
+        "gamma": 0.5027170373543239,
+        "reg_alpha": 0.006839315815486355,
+        "reg_lambda": 0.511027560626405
+      },
+      "CAT": {
+        "iterations": 1200,
+        "depth": 3,
+        "learning_rate": 0.04550514307334235,
+        "l2_leaf_reg": 0.029984709789290843,
+        "random_strength": 1.8369227201599383,
+        "bagging_temperature": 0.4405923593474408
+      },
+      "LGBM": {
+        "n_estimators": 1000,
+        "learning_rate": 0.07958902656494099,
+        "num_leaves": 89,
+        "max_depth": 7,
+        "min_child_samples": 6,
+        "subsample": 0.8265032700559845,
+        "colsample_bytree": 0.5022544913137316,
+        "reg_alpha": 0.00037014822164067873,
+        "reg_lambda": 0.011370721416715369
+      },
+      "RF": {
+        "n_estimators": 800,
+        "max_depth": 16,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "max_features": 0.6,
+        "bootstrap": false
+      },
+      "GBR": {
+        "n_estimators": 300,
+        "learning_rate": 0.06725055383088001,
+        "max_depth": 5,
+        "min_samples_split": 4,
+        "min_samples_leaf": 4,
+        "subsample": 0.7448025720457776,
+        "max_features": null
+      },
+      "KNN": {
+        "n_neighbors": 2,
+        "weights": "distance",
+        "metric": "manhattan",
+        "p": 2
+      },
+      "KRR": {
+        "alpha": 0.13353906599357449,
+        "gamma": 0.003127040559429493,
+        "kernel": "polynomial",
+        "degree": 4
+      },
+      "SVR": {
+        "C": 997.3664792358718,
+        "gamma": 0.0005756071188692101,
+        "epsilon": 1.3372010855825203,
+        "kernel": "sigmoid",
+        "degree": 2
+      }
+    }
+  }
+}
