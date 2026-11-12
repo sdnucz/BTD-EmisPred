@@ -48,8 +48,8 @@ Training data require `SMILES`, `Solvent` and `λem (nm)` columns.
 Solvent names are normalized consistently during training and prediction:
 PHME → TOL, TCM → CFM, PBSBUFFER → PBS, and THF\\H2O → THF/H2O.
 The supplied dataset contains 1,012 molecule–environment records across
-27 solvent/environment categories. The `Solvent` column supplies the labels
-used for feature encoding.
+28 solvent/environment categories. The `Solvent` column supplies the labels
+used for feature encoding. MTBE denotes methyl tert-butyl ether.
 
 Run training with the supplied configuration:
 
