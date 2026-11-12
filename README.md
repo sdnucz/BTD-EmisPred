@@ -170,12 +170,10 @@ used when available.
 
 ## Current run and archive
 
-The bundled pretrained LightGBM is the existing selected model (816 training
-records, 82 features, 28 solvent/environment categories, including MTBE). Its
-historical selection compared seven tuned algorithms with inherited GBR parameters.
-The current training entry searches all eight algorithms with 50 trials each.
-The newly started search was stopped; the supplied weights were not retrained.
-Running the current training workflow may therefore select a different model.
+The current training workflow performs 50 Optuna trials for each of eight
+algorithms. The repository also provides a previously trained LightGBM model
+for direct prediction. Its provenance is recorded in
+[`pretrained/Model_Info.json`](pretrained/Model_Info.json).
 
 [Download the source and pretrained-model archive](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.3.4-pretrained-lightgbm).
 After training, verify search completion with:
