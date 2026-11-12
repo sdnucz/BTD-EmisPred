@@ -250,6 +250,15 @@ def feature_matrix(structural, solvents, categories):
 def fit_selector(structural, training, config):
     categories = sorted(training.Solvent.map(normalize_solvent_label).unique().tolist())
     x, _ = feature_matrix(structural, training.Solvent, categories)
+    if 'solvent_feature_order' in config:
+        order = config['solvent_feature_order']
+        present = [name for name in x if name.startswith('Solvent_')]
+        if (not isinstance(order,list) or len(order)!=len(set(order))
+                or not set(present).issubset(order)
+                or any(not isinstance(name,str) or not name.startswith('Solvent_') for name in order)):
+            raise ValueError('Invalid or incomplete solvent feature order.')
+        x = x[[name for name in x if not name.startswith('Solvent_')]
+              + [name for name in order if name in present]]
     y = training[TARGET].to_numpy(dtype=float)
     if not np.isfinite(y).all():
         raise ValueError('Nonfinite training labels.')
