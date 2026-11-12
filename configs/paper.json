@@ -339,16 +339,6 @@
   "protected_features": [
     "Morgan_1073"
   ],
-  "fixed_gbr_parameters": {
-    "n_estimators": 300,
-    "learning_rate": 0.06725055383088001,
-    "max_depth": 5,
-    "min_samples_split": 4,
-    "min_samples_leaf": 4,
-    "subsample": 0.7448025720457776,
-    "max_features": null
-  },
-  "gbr_protocol": "inherited fixed parameters, no new GBR Optuna search",
   "solvent_feature_order": [
     "Solvent_AC",
     "Solvent_ACN",

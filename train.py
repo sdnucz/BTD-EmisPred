@@ -49,8 +49,7 @@ def prediction_frame(raw, indices, prediction, unknown):
     result['unknown_solvent'] = unknown
     return result
 
-def fit_context(structural, raw, fit, valid, config, output, compare_candidates=False, frozen=None,
-                replay_parameters=None):
+def fit_context(structural, raw, fit, valid, config, output, compare_candidates=False, frozen=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     fit = np.asarray(fit, dtype=int)
@@ -74,32 +73,6 @@ def fit_context(structural, raw, fit, valid, config, output, compare_candidates=
         for name in config['search_spaces']:
             folder = output / 'candidates' / name
             folder.mkdir(parents=True)
-            fixed = config.get('fixed_gbr_parameters') if name == 'GBR' else None
-            if replay_parameters is not None:
-                if set(replay_parameters) != set(config['search_spaces']):
-                    raise ValueError('Replay parameters must cover exactly the configured candidates.')
-                parameters = replay_parameters[name]
-                if fixed is not None and parameters != fixed:
-                    raise ValueError('Archived GBR parameters differ from the fixed configuration.')
-            else:
-                parameters = fixed
-            if parameters is not None:
-                scores = []
-                for number, fold in enumerate(cached):
-                    estimator = build_model(optuna.trial.FixedTrial(parameters), name,
-                        None if config['seed'] is None else config['seed'] + number,
-                        config['threads'], config['search_spaces'])
-                    pred = checked_fit_predict(estimator, fold['x_train'], fold['y_train'], fold['x_valid'])
-                    scores.append(float(np.sqrt(np.mean((pred - fold['y_valid']) ** 2))))
-                row = dict(algorithm=name, mean_inner_RMSE=float(np.mean(scores)), best_trial=None,
-                    parameters=parameters, inner_fold_rmse=scores, trial_attempts=0,
-                    successful_trials=0, fixed_parameter_evaluations=1,
-                    parameter_source='archived candidate parameters' if replay_parameters is not None
-                                     else 'inherited fixed GBR parameters')
-                candidates.append(row)
-                write_json(folder / 'Best_Parameters.json', row)
-                print(f'{output.name}: {name}, inner RMSE={row["mean_inner_RMSE"]:.4f} (fixed parameters)', flush=True)
-                continue
             study = optuna.create_study(direction='minimize', sampler=optuna.samplers.TPESampler(seed=config['seed']))
 
             def objective(trial):
@@ -180,7 +153,7 @@ def evaluation_rows(frame, label):
             rows.append(dict(evaluation=label, subset=subset, n=len(part), n_molecules=part.canonical_smiles.nunique(), **compute_metrics(part[TARGET].to_numpy(float), part.prediction_nm.to_numpy(float))))
     return rows
 
-def train(data, output, config, partitions=None, parameters=None):
+def train(data, output, config, partitions=None):
     output = Path(output)
     if output.exists():
         raise FileExistsError(f'Output already exists: {output}')
@@ -188,12 +161,6 @@ def train(data, output, config, partitions=None, parameters=None):
         raise ValueError('This release has no residual correction.')
     raw = load_data(data)
     frozen = load_frozen(partitions, data, raw.canonical_smiles.tolist(), config) if partitions else None
-    replay = json.loads(Path(parameters).read_text()) if parameters is not None else None
-    if replay is not None and (frozen is None or set(replay) != set(frozen['contexts'])):
-        raise ValueError('Parameter replay requires matching frozen contexts.')
-    def candidate_parameters(context):
-        return None if replay is None else {name: row['parameters']
-            for name, row in replay[context]['candidates'].items()}
     if frozen is None:
         fit, test = group_holdout(raw[TARGET].to_numpy(), raw.canonical_smiles.to_numpy(), config['seed'], config['test_size'], config['stratify_bins'])
     else:
@@ -229,8 +196,7 @@ def train(data, output, config, partitions=None, parameters=None):
     write_json(output / 'Environment.json', {name: importlib.metadata.version(name) for name in ['numpy', 'pandas', 'scikit-learn', 'xgboost', 'rdkit', 'optuna', 'catboost', 'lightgbm']})
     with ProcessPoolExecutor(max_workers=config['outer_jobs'], mp_context=multiprocessing.get_context('spawn')) as pool:
         futures = {pool.submit(fit_context, structural, raw, a, b, config, output / 'outer' / f'{i:02d}',
-                               compare_candidates=config.get('export_candidate_predictions', False), frozen=frozen,
-                               replay_parameters=candidate_parameters(f'outer/{i:02d}')): i for i, (a, b) in enumerate(outer)}
+                               compare_candidates=config.get('export_candidate_predictions', False), frozen=frozen): i for i, (a, b) in enumerate(outer)}
         for future in as_completed(futures):
             future.result()
     pieces = []
@@ -267,8 +233,7 @@ def train(data, output, config, partitions=None, parameters=None):
         pd.concat(comparisons).to_csv(output / 'Candidate_Outer_OOF_Predictions.csv', index=False)
         pd.DataFrame(comparison_metrics).to_csv(output / 'Candidate_Outer_OOF_Metrics.csv', index=False)
     final = fit_context(structural, raw, fit, test, config, output / 'final', frozen=frozen,
-                        compare_candidates=config.get('export_candidate_predictions', False),
-                        replay_parameters=candidate_parameters('final'))
+                        compare_candidates=config.get('export_candidate_predictions', False))
     heldout = pd.read_csv(output / 'final/Predictions.csv')
     fitted = pd.read_csv(output / 'final/Training_Fit_Predictions.csv')
     pd.DataFrame(evaluation_rows(oof, 'outer_OOF') + evaluation_rows(heldout, 'independent_test')
@@ -309,12 +274,10 @@ def load_config(path):
         raise ValueError('Unsupported candidate algorithm or parameter specification.')
     if not isinstance(config.get('export_candidate_predictions',False),bool):
         raise ValueError('export_candidate_predictions must be a boolean.')
-    if 'fixed_gbr_parameters' in config and (not isinstance(config['fixed_gbr_parameters'],dict)
-            or 'GBR' not in config['search_spaces']
-            or set(config['fixed_gbr_parameters']) != set(config['search_spaces']['GBR'])):
-        raise ValueError('Fixed GBR parameters must match the configured GBR parameter names.')
     if config['threads'] > 10 or config['outer_jobs'] != 1:
-        raise ValueError('This reproduction uses at most 10 threads and one outer worker.')
+        raise ValueError('Use at most 10 threads and one concurrent outer fold.')
+    if 'fixed_gbr_parameters' in config:
+        raise ValueError('fixed_gbr_parameters is no longer supported; define GBR search ranges in search_spaces.')
     return config
 
 def draw_parameters(trial,space):
@@ -362,9 +325,8 @@ def main():
     parser.add_argument('--config',required=True,help='Training settings, e.g. configs/paper.json.')
     parser.add_argument('--output',required=True)
     parser.add_argument('--partitions', help='Frozen_Partitions.json with adjacent Dataset_SHA256.txt.')
-    parser.add_argument('--parameters', help='Archived candidate parameters; refit and rescore without a new search.')
     args=parser.parse_args()
-    train(args.data,args.output,load_config(args.config),args.partitions,args.parameters)
+    train(args.data,args.output,load_config(args.config),args.partitions)
 
 if __name__=='__main__':
     main()
