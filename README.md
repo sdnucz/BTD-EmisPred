@@ -1,39 +1,37 @@
 # BTD-EmisPred
 
-BTD-EmisPred predicts the fluorescence emission wavelength of BTD-based
-molecules from molecular SMILES and solvent information. It combines molecular
-fingerprints, RDKit fragment counts and solvent features with machine-learning
-regression. Training uses molecule-grouped nested cross-validation for feature
-selection, algorithm comparison and parameter optimization.
-
-## Online prediction
-
-Our trained model is deployed on the [BTD-EmisPred website](https://btd-emispred.online)
-and can be used directly in your browser. Enter a molecular SMILES string and
-select a solvent to obtain the predicted emission wavelength in nm.
+BTD-EmisPred predicts fluorescence emission wavelengths of BTD-based molecules
+from molecular SMILES and solvent information. It combines Morgan fingerprints,
+RDKit fragment counts and solvent one-hot features with regression models.
+Our trained model is available on the [BTD-EmisPred website](https://btd-emispred.online).
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| `train.py` | Run nested cross-validation, select an algorithm and its parameters, fit the final model and evaluate test predictions. |
-| `predict.py` | Predict emission wavelengths for new molecule–solvent records using a trained model. |
-| `plot_review_results.py` | Recompute long-wavelength subset metrics and draw eight-algorithm outer-CV comparison figures from saved predictions. |
-| `data/dataset.py` | Clean records, group molecules, construct features and perform feature selection within training folds. |
-| `emission_project/utils.py` | Provide shared molecular, solvent, data-reading and evaluation utilities. |
-| `data/data/nir2_emission_dataset.csv` | Store molecular structures, solvents, experimental emission wavelengths and source information. |
-| `requirements.txt` | List the Python dependencies and their versions. |
-| `configs/paper.json` | Configure data splitting, feature construction, feature selection and algorithm parameter searches. |
-| `frozen_partitions.py` | Validate and load fixed molecule-grouped partitions. |
-| `splits/Frozen_Partitions.json` | Record the training/test split, ten outer folds and three inner folds for each selection round. |
-| `splits/Dataset_SHA256.txt` | Bind the fixed partitions to the supplied dataset. |
-| `configs/Selector.json` | Reference full-training feature order, solvent vocabulary and RF-RFE preprocessing state. |
+| `reproduce.py` | Refit the archived candidate parameters or repeat the parameter searches using the fixed partitions. |
+| `compare_reproduction.py` | Compare newly fitted selectors, algorithm choices, scores and predictions with the reference results. |
+| `train.py` | Run molecule-grouped nested cross-validation, candidate selection, final fitting and test evaluation. |
+| `predict.py` | Predict emission wavelengths from a trained model and its selector. |
+| `plot_review_results.py` | Generate outer-CV comparison figures and long-wavelength evaluation tables from run outputs. |
+| `data/dataset.py` | Clean records, group molecules, construct features and fit fold-local feature selection. |
+| `emission_project/utils.py` | Molecular, solvent and evaluation utilities. |
+| `data/data/nir2_emission_dataset.csv` | The 1,012-record dataset, with 28 solvent/environment categories. |
+| `configs/paper.json` | Feature settings, parameter search spaces, fixed GBR parameters, random seed and thread settings. |
+| `configs/Estimator_Parameters.json` | Candidate parameters and reference scores for ten outer rounds and final selection. |
+| `configs/Selector.json` | The final model's ordered 82-feature selector and preprocessing information. |
+| `configs/Environment.json` | Software versions used for the reference results. |
+| `configs/Final_Selection.json` | Reference final algorithm selection. |
+| `frozen_partitions.py` | Validate the dataset and load molecule-grouped partitions. |
+| `splits/Frozen_Partitions.json` | Training/test, outer-CV and inner-CV record IDs. |
+| `splits/Dataset_SHA256.txt` | Dataset checksum. |
+| `reference/` | Expected predictions and selector check values, used only after fitting. |
+| `requirements.txt` | Pinned Python dependencies. |
+| `tests/test_reproduction.py` | Targeted checks for fixed parameters, feature order and reproduction comparisons. |
 
-## Usage
+## Install
 
-### 1. Install
-
-Use Python 3.12 and install the dependencies:
+Use Python 3.12:
 
 ```bash
 conda create -n your_env python=3.12 -y
@@ -41,117 +39,93 @@ conda activate your_env
 pip install -r requirements.txt
 ```
 
-### 2. Train
-
-Training data require `SMILES`, `Solvent` and `λem (nm)` columns.
-
-Solvent names are normalized consistently during training and prediction:
-PHME → TOL, TCM → CFM, PBSBUFFER → PBS, and THF\\H2O → THF/H2O.
-The supplied dataset contains 1,012 molecule–environment records across
-28 solvent/environment categories. The `Solvent` column supplies the labels
-used for feature encoding. MTBE denotes methyl tert-butyl ether.
-
-Run training with the supplied configuration:
+## Reproduce the archived results
 
 ```bash
-python train.py --data data/data/nir2_emission_dataset.csv \
-  --config configs/paper.json --partitions splits/Frozen_Partitions.json \
-  --output outputs/run
+python reproduce.py --mode refit --output outputs/reproduced
+python compare_reproduction.py --run outputs/reproduced
 ```
 
-The fixed split contains 816 training records (366 molecules) and 196 test
-records (94 molecules), with no molecule shared between them. Partition IDs are
-zero-based `record_id` values assigned by `load_data` after cleaning and
-deduplication, rather than source molecule numbers. The archive includes three
-inner folds for each outer training set and for final selection on all training
-records. The loader checks dataset integrity, fold coverage and molecular separation.
+This refits preprocessing, feature selection and all eight candidates from the
+supplied data in each training partition, using the archived candidate parameters.
+It recalculates the three inner-fold scores, selects the lowest mean RMSE and
+refits the selected model. It does not load the archived model or reference
+predictions for fitting. Reference predictions are read only by the comparison
+script. A successful comparison writes `Reproduction_Verification.json`.
 
-For a different dataset, omit `--partitions` to generate splits using the configuration.
+The fixed split contains 816 training records (366 molecules) and 196 test records
+(94 molecules). IDs refer to cleaned zero-based `record_id` values. The ten outer
+rounds evaluate the selection procedure; a separate three-fold selection on the
+full training set yields the final LightGBM model.
 
-The supplied configuration uses:
+## Repeat the parameter searches
+
+```bash
+python reproduce.py --mode search --output outputs/search
+python compare_reproduction.py --run outputs/search
+```
+
+The archived result compares eight candidate algorithms: XGBoost, CatBoost,
+LightGBM, RF, GBR, KNN, KRR and SVR. Seven algorithms undergo 50 Optuna trials per
+selection round. GBR uses parameters inherited from the prior 1,011-record final
+training selection, evaluated on the same three inner folds without a new GBR
+search. This gives 3,850 search attempts across eleven selection rounds, plus
+fixed-parameter GBR evaluations. It is a reconstruction of that historical
+comparison, rather than eight newly tuned algorithms. The inherited GBR comparison
+is conditional on that earlier parameter selection.
 
 | Setting | Value |
 | --- | --- |
-| Molecule-grouped training/test split | Approximately 80% / 20% |
-| Outer / inner cross-validation | 10 / 3 folds |
-| Morgan fingerprint length | 2,048 bits |
-| Morgan fingerprint radius | 2 |
+| Outer / inner molecule-grouped CV | 10 / 3 folds |
+| Morgan fingerprint | Radius 2, 2,048 bits |
+| RDKit fragments | 15 |
 | Absolute correlation threshold | 0.5 |
-| Features retained by random-forest RFE | 82, including protected Morgan_1073 |
+| RF-RFE retained features | 82, including protected Morgan_1073 |
 | RF-RFE trees / maximum depth / elimination step | 150 / 10 / 20 |
-| Optuna trials per algorithm per selection round | 50 for each of the eight algorithms |
-| Candidate algorithms | XGBoost, CatBoost, LightGBM, RF, GBR, KNN, KRR, SVR |
-| Random seed | 2 |
-| Molecular-target stratification bins | 5 |
-| CPU threads / concurrent outer folds | 10 / 1 |
+| Random seed / stratification bins | 2 / 5 |
+| Estimator threads / concurrent outer folds | 2 / 1 |
 
-Within each outer training fold, preprocessing and feature selection are fitted
-on the inner training folds. The lowest mean inner-fold RMSE selects the algorithm
-and parameters. All eight algorithms undergo 50 Optuna trials each on the same
-inner folds, including GBR. The selected pipeline
-is refitted on the full outer training fold
-to predict its outer test fold. After outer CV, the same inner selection procedure
-is repeated on the full training set, followed by refitting and held-out testing.
+Feature selection is fitted independently inside each inner training fold and
+again on the corresponding full outer training set. The final selector is fitted
+on all training records. `solvent_feature_order` preserves the numerical column
+order of the archived fit after the MTBE label update; it does not fit a vocabulary
+on validation data. Each training fold derives its own available solvent categories.
+The original two-thread setting is retained because KNN predictions with tied
+neighbor distances can differ when threading changes.
 
-Edit `configs/paper.json`, or copy it to a separate JSON file and pass that
-file with `--config`. The configuration contains:
+`refit` verifies the fitted result conditional on saved parameters. `search`
+additionally repeats Optuna optimization. Use the pinned environment; different
+numerical libraries, hardware or thread settings can affect tie handling and
+optimization trajectories. The comparison script checks 44 selectors, 88 candidate
+parameter/score sets, procedure OOF, eight-algorithm outer OOF, final inner predictions,
+training/test predictions and external examples. Prediction tolerance is 1e-7 nm.
 
-- Data splitting: `test_size`, `outer_folds`, `inner_folds`, `stratify_bins`.
-- Feature construction: `morgan_radius`, `morgan_bits`.
-- Feature selection: `selected_features`, `correlation_threshold`,
-  `rfe_estimators`, `rfe_depth`, `rfe_step`, `protected_features`.
-- Parameter search: `n_trials`, `search_spaces`.
+## Predict new molecules
 
-`seed`, `threads` and `outer_jobs` control reproducibility and CPU use.
-`search_spaces` maps candidate names (`XGB`, `CAT`, `LGBM`, `RF`, `GBR`,
-`KNN`, `KRR`, `SVR`) to estimator parameters. Each parameter can be a fixed
-value or a search specification: `kind` = `int` / `float` with `low`, `high`
-and optional `step` / `log`, or `kind` = `categorical` with `choices`.
-
-`protected_features` remain in the feature set throughout variance filtering,
-correlation filtering and RF-RFE. They count toward the total of 82 features.
-LightGBM participates in algorithm selection and uses the same saved-feature
-prediction interface as the other estimators.
-
-`configs/Selector.json` records the 82 features obtained on the fixed full
-training set with `configs/paper.json`. It is a reference for checking the final
-selector; training refits feature selection separately in every training fold.
-Use the selector saved alongside each trained model for prediction.
-
-Training writes cross-validation predictions, evaluation metrics, search
-records and the final model to `outputs/run`. The trained model and its saved
-feature selector are stored in `outputs/run/final`. Use a new output directory
-for each training run.
-
-### 3. Predict
-
-Prepare a CSV file with `SMILES` and `Solvent` columns, then run:
+Prepare a CSV with `SMILES` and `Solvent` columns:
 
 ```bash
-python predict.py --model outputs/run/final \
+python predict.py --model outputs/reproduced/final \
   --input new_molecules.csv --output new_predictions.csv
 ```
 
-The output preserves the input columns and adds `prediction_nm` (predicted
-emission wavelength in nm) and `unknown_solvent` (whether the solvent was
-absent from the model's training vocabulary). The saved selector supplies
-the feature order and fingerprint settings. Use a new output filename for
-each prediction run.
+The output adds `prediction_nm` and `unknown_solvent`. The matching saved selector
+supplies the feature order and solvent vocabulary. Use a new output directory or
+filename for every run.
 
-### 4. Recompute comparison tables and figures
-
-Keep `export_candidate_predictions` enabled when training. Then run:
+## Generate evaluation figures
 
 ```bash
-python plot_review_results.py --run outputs/run --output outputs/review_figures
+python plot_review_results.py --run outputs/reproduced --output outputs/figures
 ```
 
-The script checks outer-fold coverage, molecule separation, inner-score selections
-and agreement between selected-algorithm predictions and the procedure OOF predictions.
-It exports MAE/RMSE and record/molecule counts for experimental wavelengths
-at or above 1,000 nm, eight-algorithm scatter plots, fold-level comparison plots,
-and each outer fold's selected algorithm. Scatter-plot metrics pool the OOF
-predictions; comparison bars show the mean ± sample SD across ten folds, with
-all ten fold values displayed. PDF, SVG, PNG and CSV files are written to the
-specified output directory. Use `--font-dir` to load local TTF fonts; Arial is
-used when available.
+This exports PNG, PDF, SVG and CSV files for eight-algorithm outer-CV comparisons,
+outer selections and evaluation at experimental wavelengths of at least 1,000 nm.
+Scatter-plot metrics use pooled predictions; comparison bars use the mean and
+sample SD across ten folds. Use `--font-dir` to supply local fonts.
+
+## Download the model and figure-source archive
+
+The matching model, full selector states, search records, predictions and source
+figure data are provided in the
+[final LightGBM reproduction release](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.3.2-final-lightgbm-reproduction).
