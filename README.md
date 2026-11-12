@@ -53,6 +53,12 @@ refits the selected model. It does not load the archived model or reference
 predictions for fitting. Reference predictions are read only by the comparison
 script. A successful comparison writes `Reproduction_Verification.json`.
 
+The full parameter-refit check passed in the pinned environment: all 44 selectors,
+88 candidate parameter/score sets and all reference prediction files matched.
+The maximum prediction difference was 4.55e-13 nm. See `verification/` for the
+report. A fresh Optuna-search rerun is a separate check and is not covered by
+that passed refit report.
+
 The fixed split contains 816 training records (366 molecules) and 196 test records
 (94 molecules). IDs refer to cleaned zero-based `record_id` values. The ten outer
 rounds evaluate the selection procedure; a separate three-fold selection on the
