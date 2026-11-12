@@ -34,6 +34,10 @@ select a solvent to obtain the predicted emission wavelength in nm.
 | `splits/Frozen_Partitions.json` | Record the training/test split, ten outer folds and three inner folds for each selection round. |
 | `splits/Dataset_SHA256.txt` | Bind the fixed partitions to the supplied dataset. |
 | `reproduce.py` | Run all eight 50-trial searches with the supplied configuration and frozen folds. |
+| `refit_reference.py` | Refit archived candidate parameters on the fixed partitions to reconstruct the reported results. |
+| `compare_reproduction.py` | Compare a parameter-refit run with the archived selectors, choices, inner scores and predictions. |
+| `verify_reference.py` | Check the archived dataset, partitions, predictions and pretrained model, and export reviewer figures. |
+| `reference/` | Matched prediction files, historical parameters/configuration, trial records and numerical figure sources. |
 | `verify_run.py` | Check search counts, inner scores and selected candidates after training. |
 
 ## Usage
@@ -48,7 +52,7 @@ conda activate your_env
 pip install -r requirements.txt
 ```
 
-### 2. Train (optional)
+### 2. Run a new eight-algorithm search (optional)
 
 Training data require `SMILES`, `Solvent` and `λem (nm)` columns.
 
@@ -204,19 +208,75 @@ to load that font explicitly. Otherwise the serif fallback is DejaVu Serif.
 These values describe structural similarity, rather than feature correlation
 or prediction accuracy.
 
-## Current run and archive
+## Reproduce the reported LightGBM results
 
-The current training workflow performs 50 Optuna trials for each of eight
-algorithms. The repository also provides a previously trained LightGBM model
-for direct prediction. Its provenance is recorded in
-[`pretrained/Model_Info.json`](pretrained/Model_Info.json).
+The numerical sources for the existing LightGBM figures are in `reference/`.
+They cover 816 procedure OOF predictions, 196 independent test predictions,
+6,528 eight-algorithm outer predictions, 6,528 final-selection inner predictions,
+training-fit predictions and the external examples. Record IDs map to the supplied
+dataset after `load_data` cleaning. `Estimator_Parameters.json` contains all 88
+candidate parameter/score sets across ten outer rounds and final selection.
+`Historical_Config.json` records the configuration that produced these results;
+`Optuna_Trials.csv` provides the corresponding search history. SHAP numerical
+sources are in `reference/figure_data/`.
 
-[Download the source and pretrained-model archive](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.3.4-pretrained-lightgbm).
-After training, verify search completion with:
+### Check saved results and regenerate reviewer figures
+
+```bash
+python verify_reference.py --output outputs/reference_check --figures
+python count_similarity.py --output outputs/count_similarity
+python plot_count_similarity.py --input outputs/count_similarity/Count_similarity.csv \
+  --output outputs/count_similarity/figures
+```
+
+The reference check validates file hashes, all molecular partitions, per-record
+labels, candidate selections and agreement between selected-candidate and
+procedure OOF predictions. It independently predicts the training/test and
+external examples with `pretrained/Model.joblib`. It exports pooled metrics,
+experimental-wavelength >=1,000 nm metrics with record and molecule counts,
+eight-algorithm outer comparison plots and per-fold selection tables.
+This check reads archived outer predictions; it does not refit the outer models.
+
+### Refit parameters and verify predictions
+
+```bash
+python refit_reference.py --output outputs/reference_refit
+python compare_reproduction.py --run outputs/reference_refit
+```
+
+This command refits preprocessing, feature selection and all eight candidates
+in each relevant training partition using archived candidate parameters, then
+recomputes inner scores and selects/refits the lowest-RMSE candidate. It uses
+neither archived predictions nor the pretrained model for fitting. The comparison
+checks all 44 selectors, 88 candidate parameter/score sets and all seven prediction
+tables at an absolute tolerance of 1e-7 nm. `--context final` or
+`--context outer/00` can run a single context; the complete comparison requires
+all contexts. Keep the pinned software and two-thread setting, since tied KNN
+distances can be resolved differently when numerical/thread settings change.
+
+The historical LightGBM result used 50 Optuna trials for each of seven algorithms
+and evaluated inherited GBR parameters from the prior 1,011-record selection
+on the same inner folds. It contains 3,850 search attempts across eleven selection
+rounds. The current `reproduce.py` instead starts 50 trials for **each of all eight
+algorithms**, including GBR (4,400 attempts). It is a new search and may select
+a different final model. `refit_reference.py` reconstructs the fitted historical
+results conditional on their saved parameters; it does not repeat their searches.
+The earlier complete refit verification is retained in
+`reference/verification/Prior_Full_Refit.json`; it is not evidence that the current
+eight-algorithm search reproduces the archived LightGBM result.
+
+## Download
+
+[Download the trained model and reproducibility supplement](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.3.4-pretrained-lightgbm).
+The supplementary archive records its exact source commit and file checksums.
+The existing release tag identifies the original pretrained-model publication;
+use the supplement's `SOURCE_COMMIT.json` for its matching code snapshot.
+
+After a new eight-algorithm search, verify completion with:
 
 ```bash
 python verify_run.py --run outputs/run
 ```
 
-The entry script performs this check automatically. The plotting command above
-also checks OOF coverage, molecular separation and prediction consistency.
+`reproduce.py` performs this check automatically. Model provenance is recorded
+in [`pretrained/Model_Info.json`](pretrained/Model_Info.json).
