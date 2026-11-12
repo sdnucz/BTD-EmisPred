@@ -12,7 +12,7 @@
   "rfe_step": 20,
   "n_trials": 50,
   "seed": 2,
-  "threads": 10,
+  "threads": 2,
   "outer_jobs": 1,
   "export_candidate_predictions": true,
   "search_spaces": {
@@ -338,5 +338,45 @@
   "residual_correction": false,
   "protected_features": [
     "Morgan_1073"
+  ],
+  "fixed_gbr_parameters": {
+    "n_estimators": 300,
+    "learning_rate": 0.06725055383088001,
+    "max_depth": 5,
+    "min_samples_split": 4,
+    "min_samples_leaf": 4,
+    "subsample": 0.7448025720457776,
+    "max_features": null
+  },
+  "gbr_protocol": "inherited fixed parameters, no new GBR Optuna search",
+  "solvent_feature_order": [
+    "Solvent_AC",
+    "Solvent_ACN",
+    "Solvent_ACOET",
+    "Solvent_MTBE",
+    "Solvent_BZN",
+    "Solvent_BZNIT",
+    "Solvent_CBZN",
+    "Solvent_CFM",
+    "Solvent_CHX",
+    "Solvent_DCE",
+    "Solvent_DCM",
+    "Solvent_DEE",
+    "Solvent_DIOX",
+    "Solvent_DMF",
+    "Solvent_DMSO",
+    "Solvent_DMSO_H2O",
+    "Solvent_ETOH",
+    "Solvent_H2O",
+    "Solvent_HEX",
+    "Solvent_IPROPOH",
+    "Solvent_MEOH",
+    "Solvent_MXYLENE",
+    "Solvent_OCTOH",
+    "Solvent_PBS",
+    "Solvent_PXYLENE",
+    "Solvent_THF",
+    "Solvent_THF_H2O",
+    "Solvent_TOL"
   ]
 }
