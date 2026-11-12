@@ -17,3 +17,5 @@ local_config*.json
 *.zip
 .DS_Store
 Thumbs.db
+
+!pretrained/Model.joblib

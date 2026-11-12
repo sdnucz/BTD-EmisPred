@@ -17,6 +17,9 @@ select a solvent to obtain the predicted emission wavelength in nm.
 | File | Purpose |
 | --- | --- |
 | `train.py` | Run nested cross-validation, select an algorithm and its parameters, fit the final model and evaluate test predictions. |
+| `pretrained/Model.joblib` | Ready-to-use trained LightGBM model. |
+| `pretrained/Selector.json` | Saved 82-feature order, solvent vocabulary and preprocessing information. |
+| `pretrained/Model_Info.json` | Model provenance and file checksums. |
 | `predict.py` | Predict emission wavelengths for new molecule–solvent records using a trained model. |
 | `plot_review_results.py` | Recompute long-wavelength subset metrics and draw eight-algorithm outer-CV comparison figures from saved predictions. |
 | `data/dataset.py` | Clean records, group molecules, construct features and perform feature selection within training folds. |
@@ -42,7 +45,7 @@ conda activate your_env
 pip install -r requirements.txt
 ```
 
-### 2. Train
+### 2. Train (optional)
 
 Training data require `SMILES`, `Solvent` and `λem (nm)` columns.
 
@@ -131,12 +134,15 @@ for each training run.
 
 ### 3. Predict
 
+The repository includes a trained LightGBM model; no training is required to use it.
 Prepare a CSV file with `SMILES` and `Solvent` columns, then run:
 
 ```bash
-python predict.py --model outputs/run/final \
+python predict.py --model pretrained \
   --input new_molecules.csv --output new_predictions.csv
 ```
+
+For a newly trained model, use `--model outputs/run/final` instead.
 
 The output preserves the input columns and adds `prediction_nm` (predicted
 emission wavelength in nm) and `unknown_solvent` (whether the solvent was
@@ -164,11 +170,14 @@ used when available.
 
 ## Current run and archive
 
-The current workflow searches all eight algorithms anew. Its selected algorithm
-and predictions are determined by the completed run. Earlier fixed-GBR results
-remain in version history and are not reference outputs for this workflow.
+The bundled pretrained LightGBM is the existing selected model (816 training
+records, 82 features, 28 solvent/environment categories, including MTBE). Its
+historical selection compared seven tuned algorithms with inherited GBR parameters.
+The current training entry searches all eight algorithms with 50 trials each.
+The newly started search was stopped; the supplied weights were not retrained.
+Running the current training workflow may therefore select a different model.
 
-[Download the matching training archive](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.3.3-eight-model-search).
+[Download the source and pretrained-model archive](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.3.4-pretrained-lightgbm).
 After training, verify search completion with:
 
 ```bash
