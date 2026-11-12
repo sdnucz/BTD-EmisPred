@@ -21,6 +21,9 @@ select a solvent to obtain the predicted emission wavelength in nm.
 | `pretrained/Selector.json` | Saved 82-feature order, solvent vocabulary and preprocessing information. |
 | `pretrained/Model_Info.json` | Model provenance and file checksums. |
 | `predict.py` | Predict emission wavelengths for new molecule–solvent records using a trained model. |
+| `count_similarity.py` | Calculate sparse-count Morgan similarity to the fixed training-set structures. |
+| `plot_count_similarity.py` | Draw the shaded count-fingerprint lollipop plot. |
+| `data/similarity_queries.csv` | Supply the 13 query structures and figure labels for the similarity analysis. |
 | `plot_review_results.py` | Recompute long-wavelength subset metrics and draw eight-algorithm outer-CV comparison figures from saved predictions. |
 | `data/dataset.py` | Clean records, group molecules, construct features and perform feature selection within training folds. |
 | `emission_project/utils.py` | Provide shared molecular, solvent, data-reading and evaluation utilities. |
@@ -167,6 +170,39 @@ predictions; comparison bars show the mean ± sample SD across ten folds, with
 all ten fold values displayed. PDF, SVG, PNG and CSV files are written to the
 specified output directory. Use `--font-dir` to load local TTF fonts; Arial is
 used when available.
+
+### 5. Count-fingerprint structural similarity
+
+Calculate each query molecule's maximum Tanimoto similarity to the unique
+structures in the fixed training set, then draw the shaded lollipop plot:
+
+```bash
+python count_similarity.py --output outputs/count_similarity
+python plot_count_similarity.py --input outputs/count_similarity/Count_similarity.csv \
+  --output outputs/count_similarity/figures
+```
+
+This analysis uses RDKit sparse-count Morgan fingerprints (radius 2,
+chirality disabled), retaining the number of occurrences of each molecular
+environment. It does not fold counts into the model's 2,048-bit representation.
+The reference contains the 366 unique structures in the 816 training records;
+the independent test set is excluded. The dataset checksum and frozen
+partitions are validated before calculation. Solvent labels are not used
+in structural similarity.
+
+The supplied query CSV contains the ten Supplementary Fig. 6 compounds and
+our three compounds, in figure order. To analyze other molecules, provide
+a CSV with `record_id`, `compound`, `cohort` and `SMILES` columns through
+`--queries`. The plotting cohorts are `SI6` and `own3`.
+
+Outputs include the maximum similarities, the corresponding nearest training
+structures, exact canonical-structure matches, and calculation metadata.
+The plot uses pale blue/orange group backgrounds, vertical lines and
+fixed-size circles, with three-decimal labels. PNG, SVG and PDF are exported.
+Times New Roman is used when available; pass `--font-file /path/to/Times.ttf`
+to load that font explicitly. Otherwise the serif fallback is DejaVu Serif.
+These values describe structural similarity, rather than feature correlation
+or prediction accuracy.
 
 ## Current run and archive
 
