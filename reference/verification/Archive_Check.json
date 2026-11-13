@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "tolerance_nm": 1e-07,
+  "dataset_records": 1012,
+  "unique_molecules": 460,
+  "solvent_categories": 28,
+  "all_partitions_verified": true,
+  "selected_OOF_matches_candidate": true,
+  "historical_search_attempts": 3850,
+  "final_algorithm": "LGBM",
+  "model_prediction_max_difference_nm": {
+    "training_fit": 2.2737367544323206e-13,
+    "independent_test": 2.2737367544323206e-13,
+    "External13.csv": 2.2737367544323206e-13,
+    "SI6_Predictions.csv": 2.2737367544323206e-13
+  },
+  "training_or_search_repeated": false,
+  "OOF_check": "Archived coverage and selected-candidate consistency; not a new outer refit"
+}
