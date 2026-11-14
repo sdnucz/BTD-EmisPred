@@ -272,7 +272,7 @@ A snapshot of this repository, including the code, dataset, fixed partitions,
 pretrained model and reference results, is also archived on
 [Zenodo](https://zenodo.org/records/24220354) for long-term access and citation.
 DOI: [10.5281/zenodo.24220354](https://doi.org/10.5281/zenodo.24220354).
-Zenodo version `v1.4.1` includes the updated similarity queries and shaded
+Zenodo version `v1.4.0` includes the updated similarity queries and shaded
 lollipop plotting code. The record links to its exact GitHub source commit.
 
 [Download the trained model and reproducibility supplement](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.4.0).
