@@ -194,15 +194,16 @@ the independent test set is excluded. The dataset checksum and frozen
 partitions are validated before calculation. Solvent labels are not used
 in structural similarity.
 
-The supplied query CSV contains the ten Supplementary Fig. 6 compounds and
+The supplied query CSV contains the ten updated external compounds (Compound 1–10) and
 our three compounds, in figure order. To analyze other molecules, provide
 a CSV with `record_id`, `compound`, `cohort` and `SMILES` columns through
-`--queries`. The plotting cohorts are `SI6` and `own3`.
+`--queries`. The plotting cohorts are `new10` and `own3`.
 
 Outputs include the maximum similarities, the corresponding nearest training
 structures, exact canonical-structure matches, and calculation metadata.
 The plot uses pale blue/orange group backgrounds, vertical lines and
-fixed-size circles, with three-decimal labels. PNG, SVG and PDF are exported.
+fixed-size circles, with three-decimal labels and enlarged text. PNG, SVG, PDF
+and the plotted source data are exported.
 Times New Roman is used when available; pass `--font-file /path/to/Times.ttf`
 to load that font explicitly. Otherwise the serif fallback is DejaVu Serif.
 These values describe structural similarity, rather than feature correlation
@@ -269,15 +270,15 @@ eight-algorithm search reproduces the archived LightGBM result.
 
 A snapshot of this repository, including the code, dataset, fixed partitions,
 pretrained model and reference results, is also archived on
-[Zenodo](https://zenodo.org/records/24186344) for long-term access and citation.
-DOI: [10.5281/zenodo.24186344](https://doi.org/10.5281/zenodo.24186344).
-This archive corresponds to GitHub commit
-[`9399d7e`](https://github.com/sdnucz/BTD-EmisPred/commit/9399d7ebf773bdfb0f278aca32f8fb2dc21be458).
+[Zenodo](https://zenodo.org/records/24220354) for long-term access and citation.
+DOI: [10.5281/zenodo.24220354](https://doi.org/10.5281/zenodo.24220354).
+Zenodo version `v1.4.1` includes the updated similarity queries and shaded
+lollipop plotting code. The record links to its exact GitHub source commit.
 
 [Download the trained model and reproducibility supplement](https://github.com/sdnucz/BTD-EmisPred/releases/tag/v1.4.0).
 The supplementary archive records its exact source commit and file checksums.
 Release `v1.4.0` is titled **BTD-EmisPred: Code, Data and Pretrained Model**.
-The release tag and Zenodo archive identify the same source commit, `9399d7e`;
+This earlier release identifies source commit `9399d7e`;
 the supplement's `SOURCE_COMMIT.json` records that code snapshot.
 
 After a new eight-algorithm search, verify completion with:

@@ -28,17 +28,18 @@ def main():
     required = {'compound', 'cohort', 'max_sparse_count_tanimoto'}
     if not required.issubset(data.columns) or data.empty:
         raise ValueError('Input must be the nonempty Count_similarity.csv output.')
+    display_labels = data.compound.astype(str).tolist()
     values = data.max_sparse_count_tanimoto.to_numpy(float)
     if not np.isfinite(values).all() or ((values < 0) | (values > 1)).any():
         raise ValueError('Similarities must be finite values between zero and one.')
-    if not set(data.cohort).issubset({'SI6', 'own3'}):
-        raise ValueError('Plot cohorts must be SI6 or own3.')
-    palette = {'SI6': '#599DB7', 'own3': '#EFA775'}
-    backgrounds = {'SI6': '#EAF5F8', 'own3': '#FFF5E9'}
+    if not set(data.cohort).issubset({'new10', 'own3'}):
+        raise ValueError('Plot cohorts must be new10 or own3.')
+    palette = {'new10': '#599DB7', 'own3': '#EFA775'}
+    backgrounds = {'new10': '#EAF5F8', 'own3': '#FFF5E9'}
     colors = [palette[c] for c in data.cohort]
     x = np.arange(len(data))
-    fig, ax = plt.subplots(figsize=(15, 5.2))
-    fig.subplots_adjust(left=.09, right=.98, bottom=.28, top=.77)
+    fig, ax = plt.subplots(figsize=(18, 6.0))
+    fig.subplots_adjust(left=.09, right=.98, bottom=.30, top=.77)
     # Shade contiguous cohort blocks, preserving the supplied compound order.
     start = 0
     for end in range(1, len(data) + 1):
@@ -51,18 +52,18 @@ def main():
     ax.scatter(x, values, s=235, facecolors='white', edgecolors=colors, linewidths=1.1, alpha=.5, zorder=3)
     ax.scatter(x, values, s=130, c=colors, edgecolors='white', linewidths=1, zorder=4)
     for i, value in enumerate(values):
-        ax.text(i, value + .055, f'{value:.3f}', ha='center', va='bottom', fontsize=17)
+        ax.text(i, value + .055, f'{value:.3f}', ha='center', va='bottom', fontsize=21)
     ax.set_ylim(0, 1.15)
-    ax.set_xlim(-.5, len(data) - .5)
+    ax.set_xlim(-1.0, len(data) - .5)
     ax.set_yticks([0, .25, .5, .75, 1], ['0', '0.25', '0.50', '0.75', '1.00'])
-    ax.set_ylabel('Maximum Tanimoto similarity', fontsize=18, labelpad=12)
-    ax.set_title('Count Morgan fingerprint', loc='left', fontsize=22, pad=12)
-    ax.set_xticks(x, data.compound, rotation=38, ha='right', rotation_mode='anchor')
-    ax.tick_params(axis='both', labelsize=17, direction='out', length=4)
-    labels = {'SI6': 'Supplementary Fig. 6 compounds', 'own3': 'Our three compounds'}
+    ax.set_ylabel('Maximum Tanimoto similarity', fontsize=22, labelpad=12)
+    ax.set_title('Count Morgan fingerprint', loc='left', fontsize=24, pad=12)
+    ax.set_xticks(x, display_labels, rotation=55, ha='right', rotation_mode='anchor')
+    ax.tick_params(axis='both', labelsize=20, direction='out', length=4)
+    labels = {'new10': 'Compounds 1–10', 'own3': 'Our three compounds'}
     handles = [Line2D([], [], color=palette[c], marker='o', lw=1.2, markersize=9, label=labels[c])
                for c in dict.fromkeys(data.cohort)]
-    fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(.55, .99), ncol=2, frameon=False, fontsize=18)
+    fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(.55, .99), ncol=2, frameon=False, fontsize=21)
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     for text in [*ax.texts, *ax.get_xticklabels(), *ax.get_yticklabels(), ax.yaxis.label, ax._left_title]:
@@ -70,6 +71,7 @@ def main():
         if bounds.x0 < 0 or bounds.y0 < 0 or bounds.x1 > fig.bbox.width or bounds.y1 > fig.bbox.height:
             raise ValueError(f'Text outside canvas: {text.get_text()}')
     args.output.mkdir(parents=True, exist_ok=True)
+    data.assign(plot_label=display_labels).to_csv(args.output / 'Plot_Source_Data.csv', index=False, encoding='utf-8-sig')
     for extension in ['png', 'svg', 'pdf']:
         fig.savefig(args.output / f'Count_similarity_lollipop.{extension}', dpi=350, facecolor='white')
     fig.savefig(args.output / 'Preview.png', dpi=110, facecolor='white')
