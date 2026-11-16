@@ -1,0 +1,23 @@
+{
+  "algorithm": "LGBM",
+  "mean_inner_RMSE": 62.34975392471142,
+  "best_trial": 44,
+  "parameters": {
+    "n_estimators": 900,
+    "learning_rate": 0.0315859591281674,
+    "num_leaves": 117,
+    "max_depth": 6,
+    "min_child_samples": 5,
+    "subsample": 0.8357981056160655,
+    "colsample_bytree": 0.5378914033065766,
+    "reg_alpha": 0.0006673054055050692,
+    "reg_lambda": 0.03898444308597442
+  },
+  "inner_fold_rmse": [
+    63.877480560097204,
+    69.98060019798929,
+    53.191181016047764
+  ],
+  "trial_attempts": 50,
+  "successful_trials": 50
+}

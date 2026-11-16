@@ -1,0 +1,14 @@
+{
+  "algorithm": "LightGBM",
+  "training_records": 816,
+  "dataset_records": 1012,
+  "solvent_categories": 28,
+  "selected_features": 82,
+  "protected_features": [
+    "Morgan_1073"
+  ],
+  "selection_protocol": "Historical selection: seven algorithms searched; GBR used inherited fixed parameters.",
+  "training_code_protocol": "The current train.py supports eight algorithms with 50 trials each. The bundled model is the existing trained LightGBM, not an output of the interrupted new search.",
+  "model_sha256": "fc498cfd0300cb49f1d810211a5c1912b59439734679cfdfa5807f1b617d60ee",
+  "selector_sha256": "eaed33b60be524c5d1c267eb7422edc4cc9b88a8ab9d29ab41161b5c0efbfc6c"
+}

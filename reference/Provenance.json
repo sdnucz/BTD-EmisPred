@@ -1,0 +1,16 @@
+{
+  "model": "LGBM",
+  "dataset_records": 1012,
+  "solvent_categories": 28,
+  "training_records": 816,
+  "test_records": 196,
+  "historical_selection": "Seven algorithms searched with 50 Optuna trials per context; GBR evaluated inherited parameters from the prior 1011-record selection.",
+  "current_search_entry": "reproduce.py: eight algorithms, 50 trials per context, including GBR",
+  "reference_refit_entry": "refit_reference.py: fit all preprocessing, selectors and estimators using saved candidate parameters; no new search",
+  "source_predictions": "Reference results used for the existing LightGBM manuscript/SI figure package.",
+  "prior_refit_report": "verification/Prior_Full_Refit.json; an earlier complete parameter-refit check, not a fresh Optuna-search verification",
+  "morgan_1073": "Protected through all selection stages, counts within the 82 retained features",
+  "solvent_label": "MTBE, with the archived numerical column order preserved",
+  "model_sha256": "fc498cfd0300cb49f1d810211a5c1912b59439734679cfdfa5807f1b617d60ee",
+  "selector_sha256": "eaed33b60be524c5d1c267eb7422edc4cc9b88a8ab9d29ab41161b5c0efbfc6c"
+}
