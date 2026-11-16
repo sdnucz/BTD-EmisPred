@@ -8,7 +8,13 @@ molecule-grouped nested cross-validation for feature selection and comparison
 of eight regression algorithms.
 
 Use the trained model on the [website](https://btd-emispred.online), or download
-the code and model from [Zenodo](https://doi.org/10.5281/zenodo.24220354).
+the code and model from [Zenodo (project DOI)](https://doi.org/10.5281/zenodo.24186343).
+
+**Archive notice:** The Zenodo record cited in the manuscript
+(DOI: [10.5281/zenodo.24186344](https://doi.org/10.5281/zenodo.24186344))
+was inadvertently deleted during archive consolidation. A restoration request
+has been submitted to Zenodo. Please use the project DOI above to access the
+current archive.
 
 ## Files
 
